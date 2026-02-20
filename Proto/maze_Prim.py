@@ -1,4 +1,6 @@
 import random
+import argparse
+import json
 
 class Maze:
     def __init__(self, width, height):
@@ -42,9 +44,15 @@ class Maze:
 
 
 if __name__ == "__main__":
-    width = 21
-    height = 21
+    parser = argparse.ArgumentParser(description="Générateur de labyrinthe - Algorithme de Prim")
+    parser.add_argument("--width", type=int, required=True, help="Largeur du labyrinthe")
+    parser.add_argument("--height", type=int, required=True, help="Hauteur du labyrinthe")
 
-    maze = Maze(width, height)
+    args = parser.parse_args()
+
+    maze = Maze(args.width, args.height)
     maze.generate_prim()
     maze.display()
+
+    print(json.dumps(maze.maze))
+
