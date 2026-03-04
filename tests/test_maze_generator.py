@@ -11,7 +11,7 @@ from Proto.maze_Prim_loops import generate_maze, add_loops, generate_pacman_maze
 def test_maze_dimensions_basic():
     """Un maze 21x21 doit retourner exactement 21 lignes de 21 colonnes."""
     maze = generate_maze(21, 21)
-    assert len(maze) == 99, "ERREUR VOLONTAIRE : on attend 99 au lieu de 21"
+    assert len(maze) == 21
     assert all(len(row) == 21 for row in maze)
 
 
