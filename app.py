@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-from Proto.maze_Prim_loops import generate_maze as generate_maze_loops
+from Proto.maze_Prim_loops import generate_pacman_maze
 
 app = Flask(__name__)
 
@@ -11,12 +11,13 @@ def home():
 def generate_maze_route():
     width = int(request.args.get("width", 21))
     height = int(request.args.get("height", 21))
-
-    maze = generate_maze_loops(width, height)
+    loop_percent=int(request.args.get("loop_percent",25))
+    maze = generate_pacman_maze(width, height,loop_percent)
 
     return jsonify({
-        "width": width,
-        "height": height,
+        "width": len(maze[0]),
+        "height": len(maze),
+        "loop_percent": loop_percent,
         "maze": maze
     })
 
