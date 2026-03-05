@@ -1,0 +1,280 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\geometry{margin=2.5cm}
+
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4
+}
+
+\title{TER -- Génération de labyrinthes Pac-Man\\
+\large Rapport de la séance du 13 février 2026}
+\author{Ikram Benchalal, Aya Haddoun, Nada Zina}
+\date{13 février 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Objectif de la séance}
+
+L'objectif de cette séance était de :
+\begin{itemize}
+    \item Implémenter l'algorithme de Prim pour la génération de labyrinthes.
+    \item Ajouter des boucles aux labyrinthes générés pour obtenir des labyrinthes imparfaits, conformément aux exigences du projet.
+    \item Créer un outil d'analyse (\texttt{maze\_analyzer.py}) pour comparer objectivement les algorithmes DFS et Prim à l'aide de métriques.
+    \item Justifier le choix de l'algorithme de Prim pour la suite du projet.
+\end{itemize}
+
+\section{Contexte : labyrinthe parfait vs imparfait}
+
+Un labyrinthe \textbf{parfait} est un arbre couvrant : chaque cellule est reliée à toutes les autres par un chemin unique, sans boucle ni zone inaccessible. Or, le labyrinthe du Pac-Man original n'est \textbf{pas parfait} : il contient des boucles, des circuits fermés et des intersections multiples.
+
+Notre approche suit la méthode décrite par Jamis Buck dans \textit{Mazes for Programmers} : on génère d'abord un labyrinthe parfait avec un algorithme classique, puis on \textbf{détruit des murs} pour créer des boucles et obtenir un labyrinthe imparfait (\textit{braid maze}).
+
+\section{Implémentation de l'algorithme de Prim}
+
+\subsection{Principe de l'algorithme}
+
+L'algorithme de Prim randomisé fonctionne ainsi :
+\begin{enumerate}
+    \item On part d'une grille remplie de murs (matrice de 0).
+    \item On choisit une cellule de départ aléatoire et on l'ouvre (on la met à 1).
+    \item On ajoute tous les murs voisins de cette cellule à une liste de \textit{frontière}.
+    \item Tant qu'il reste des murs dans la liste :
+    \begin{itemize}
+        \item On choisit un mur \textbf{aléatoirement} dans la liste.
+        \item Si la cellule de l'autre côté du mur n'a pas encore été visitée, on ouvre le mur et la cellule.
+        \item On ajoute les nouveaux murs voisins à la liste.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Code de génération}
+
+\begin{lstlisting}[caption={Génération du labyrinthe parfait avec Prim (\texttt{maze\_prim.py})}]
+def generate_maze(width, height):
+    # cree un labyrinthe parfait avec l'algo de prim
+    maze = [[0 for _ in range(width)] for _ in range(height)]
+    
+    start_x = random.randrange(1, width, 2)
+    start_y = random.randrange(1, height, 2)
+    maze[start_y][start_x] = 1
+    
+    walls = []
+    
+    def get_walls(x, y):
+        # recupere les murs autour d'une cellule
+        result = []
+        for dx, dy in [(2,0), (-2,0), (0,2), (0,-2)]:
+            nx, ny = x + dx, y + dy
+            if 0 < nx < width and 0 < ny < height:
+                if maze[ny][nx] == 0:
+                    result.append((nx, ny, x + dx//2, y + dy//2))
+        return result
+    
+    walls.extend(get_walls(start_x, start_y))
+    
+    while walls:
+        wx, wy, px, py = random.choice(walls)
+        walls.remove((wx, wy, px, py))
+        
+        if maze[wy][wx] == 0:
+            maze[wy][wx] = 1  # ouvre la cellule
+            maze[py][px] = 1  # ouvre le mur entre
+            walls.extend(get_walls(wx, wy))
+    
+    return maze
+\end{lstlisting}
+
+La représentation du labyrinthe est une matrice 2D où \texttt{0} = mur et \texttt{1} = couloir. Les dimensions doivent être impaires pour que la grille fonctionne correctement avec le pas de 2.
+
+La fonction \texttt{get\_walls(x, y)} explore les 4 directions (haut, bas, gauche, droite) avec un pas de 2 cases. Elle retourne un tuple \texttt{(nx, ny, px, py)} où \texttt{(nx, ny)} est la cellule voisine et \texttt{(px, py)} est le mur entre les deux.
+
+Le choix aléatoire dans la liste (\texttt{random.choice(walls)}) différencie Prim de DFS : au lieu de suivre un chemin en profondeur, on pioche parmi \textbf{tous} les murs frontières, ce qui produit une texture plus uniforme.
+
+\subsection{Ajout de boucles}
+
+Pour transformer le labyrinthe parfait en labyrinthe imparfait, on supprime un pourcentage de murs qui séparent deux couloirs :
+
+\begin{lstlisting}[caption={Ajout de boucles (\texttt{add\_loops})}]
+def add_loops(maze, loop_percent=20):
+    # supprime des murs pour creer des boucles
+    height, width = len(maze), len(maze[0])
+    walls = []
+    
+    for y in range(1, height-1):
+        for x in range(1, width-1):
+            if maze[y][x] == 0:
+                if (maze[y-1][x] == 1 and maze[y+1][x] == 1) or \
+                   (maze[y][x-1] == 1 and maze[y][x+1] == 1):
+                    walls.append((y, x))
+    
+    n_remove = int(len(walls) * loop_percent / 100)
+    for y, x in random.sample(walls, min(n_remove, len(walls))):
+        maze[y][x] = 1
+    
+    return maze
+\end{lstlisting}
+
+Cette fonction identifie tous les murs qui se trouvent entre deux couloirs (horizontalement ou verticalement). Elle en sélectionne un pourcentage (\texttt{loop\_percent}) aléatoirement et les ouvre. Le paramètre \texttt{loop\_percent} contrôle la difficulté :
+\begin{itemize}
+    \item \textbf{10\%} : peu de boucles, labyrinthe plus difficile.
+    \item \textbf{25\%} : valeur par défaut, bon équilibre.
+    \item \textbf{40\%} : beaucoup de boucles, labyrinthe facile.
+\end{itemize}
+
+\subsection{Fonction wrapper}
+
+\begin{lstlisting}[caption={Génération complète d'un labyrinthe Pac-Man}]
+def generate_pacman_maze(width=15, height=15, loop_percent=25):
+    if width % 2 == 0: width += 1
+    if height % 2 == 0: height += 1
+    maze = generate_maze(width, height)
+    maze = add_loops(maze, loop_percent)
+    return maze
+\end{lstlisting}
+
+Cette fonction assure que les dimensions sont toujours impaires (nécessaire pour la grille) et enchaîne la génération parfaite puis l'ajout de boucles.
+
+\section{Outil d'analyse : \texttt{maze\_analyzer.py}}
+
+Pour comparer objectivement les algorithmes, nous avons développé un analyseur qui calcule 6 métriques sur un labyrinthe donné.
+
+\subsection{Métriques calculées}
+
+\begin{itemize}
+    \item \textbf{Nombre de couloirs} : cases accessibles au joueur.
+    $$\text{ratio couloirs} = \frac{\text{nombre de cases couloir}}{\text{cases intérieures totales}} \times 100$$
+    
+    \item \textbf{Culs-de-sac} : cases couloir avec \textbf{1 seul voisin} couloir. Ce sont les impasses où le joueur est piégé.
+    
+    \item \textbf{Intersections} : cases couloir avec \textbf{3 ou 4 voisins} couloir. Ce sont les carrefours où le joueur doit choisir une direction.
+    
+    \item \textbf{Boucles} : estimées par la formule :
+    $$\text{boucles} = E - (V - 1)$$
+    où $E$ = nombre d'arêtes (connexions entre couloirs adjacents) et $V$ = nombre de sommets (couloirs). Dans un arbre couvrant, $E = V - 1$, donc tout excédent correspond à des boucles.
+    
+    \item \textbf{Plus long chemin} : calculé par un parcours en largeur (BFS) depuis la case (1,1). Représente la profondeur d'exploration du labyrinthe.
+    
+    \item \textbf{Jouabilité} : considérée "bonne" si le nombre de culs-de-sac est inférieur au nombre d'intersections.
+\end{itemize}
+
+\subsection{Code de comptage des boucles}
+
+\begin{lstlisting}[caption={Estimation du nombre de boucles}]
+def count_loops(maze):
+    height, width = len(maze), len(maze[0])
+    corridors = 0
+    edges = 0
+    
+    for y in range(1, height-1):
+        for x in range(1, width-1):
+            if maze[y][x] == 1:
+                corridors += 1
+                # compter les voisins a droite et en bas
+                # pour eviter les doublons
+                if x+1 < width and maze[y][x+1] == 1:
+                    edges += 1
+                if y+1 < height and maze[y+1][x] == 1:
+                    edges += 1
+    
+    loops = edges - (corridors - 1)
+    return max(0, loops)
+\end{lstlisting}
+
+En ne comptant que les voisins à droite et en bas, on évite de compter chaque arête deux fois. La formule $E - (V-1)$ donne directement le nombre de cycles indépendants dans le graphe.
+
+\section{Résultats : comparaison DFS vs Prim}
+
+Nous avons généré \textbf{10 labyrinthes} de taille 31$\times$31 avec 25\% de boucles pour chaque algorithme, et calculé les moyennes :
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Métrique} & \textbf{DFS} & \textbf{Prim} & \textbf{Meilleur} \\
+\midrule
+Couloirs           & 524.2 & 523.1 & -- \\
+Culs-de-sac        & 10.0  & 34.5  & DFS \\
+Intersections      & 184.6 & 198.0 & \textbf{Prim} \\
+Boucles            & 99.0  & 101.0 & \textbf{Prim} \\
+Plus long chemin   & 61.5  & 56.8  & DFS \\
+Jouabilité         & bonne & bonne & -- \\
+\bottomrule
+\end{tabular}
+\caption{Comparaison des moyennes sur 10 générations (31$\times$31, 25\% boucles)}
+\label{tab:comparaison}
+\end{table}
+
+\section{Justification du choix de Prim}
+
+Au vu des résultats, nous choisissons l'algorithme de \textbf{Prim} pour les raisons suivantes :
+
+\begin{enumerate}
+    \item \textbf{Texture uniforme, proche du Pac-Man original.} L'algorithme de Prim sélectionne aléatoirement parmi tous les murs frontières, ce qui produit des chemins courts et ramifiés, sans biais directionnel. DFS, en revanche, crée de longs corridors sinueux car il suit un chemin en profondeur avant de revenir en arrière. La structure de Prim est plus proche du labyrinthe Pac-Man original, qui est compact avec beaucoup d'intersections.
+    
+    \item \textbf{Plus d'intersections (+7\%).} Prim génère en moyenne 198 intersections contre 184.6 pour DFS. Dans Pac-Man, les intersections sont les points stratégiques du jeu : c'est là que le joueur choisit sa direction et que les fantômes peuvent le piéger. Plus d'intersections = plus de décisions = gameplay plus riche.
+    
+    \item \textbf{Plus de boucles.} Prim produit légèrement plus de boucles (101 vs 99), ce qui renforce le caractère imparfait du labyrinthe, conformément aux exigences du sujet.
+    
+    \item \textbf{Pas de risque de stack overflow.} DFS utilise la récursion, ce qui peut provoquer un dépassement de pile sur de grands labyrinthes (par exemple 100$\times$100). Prim est itératif et n'a pas cette limitation.
+    
+    \item \textbf{Approche validée par la littérature.} Comme le souligne Jamis Buck, la plupart des algorithmes de génération créent un labyrinthe parfait puis détruisent des murs pour obtenir un \textit{braid maze}. Notre approche Prim + \texttt{add\_loops} suit exactement ce schéma.
+\end{enumerate}
+
+Le seul avantage de DFS (moins de culs-de-sac) n'est pas critique car les boucles créées par \texttt{add\_loops} offrent toujours des chemins alternatifs au joueur.
+
+\section{Complexité}
+
+\begin{itemize}
+    \item \textbf{Prim (notre implémentation)} : $O(n^2)$ où $n$ est le nombre de cellules, en raison de \texttt{walls.remove()} qui est linéaire. Peut être optimisé à $O(n \log n)$ avec un tas binaire.
+    \item \textbf{add\_loops} : $O(n)$ pour le parcours de la grille + $O(k)$ pour la sélection aléatoire de $k$ murs.
+    \item \textbf{Analyseur (BFS)} : $O(n)$ pour le plus long chemin, $O(n)$ pour les autres métriques.
+\end{itemize}
+
+Pour un labyrinthe 31$\times$31 (961 cases), le temps de génération est instantané.
+
+\section{Fichiers produits}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Fichier} & \textbf{Description} \\
+\midrule
+\texttt{Proto/maze\_prim.py}     & Générateur de labyrinthes avec Prim + boucles \\
+\texttt{Proto/maze\_dfs.py}      & Générateur de labyrinthes avec DFS + boucles \\
+\texttt{Proto/maze\_analyzer.py} & Outil d'analyse et de comparaison des algorithmes \\
+\bottomrule
+\end{tabular}
+\caption{Fichiers créés ou modifiés lors de cette séance}
+\end{table}
+
+\section{Prochaines étapes}
+
+\begin{itemize}
+    \item Ajouter la sortie en \textbf{JSON} comme demandé dans le sujet (dimensions, algorithme, paramètres, grille).
+    \item Explorer la \textbf{symétrie} du labyrinthe pour se rapprocher du style Pac-Man.
+    \item Développer le \textbf{service web} (Flask/FastAPI) pour exposer le générateur via une API HTTP.
+    \item \textbf{Déployer} sur Render.
+\end{itemize}
+
+\end{document}
