@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Labyrinthes Pac-Man - TER S2</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🎮 Générateur de Labyrinthes Pac-Man</h1>
+                <p class="subtitle">TER S2 - Génération de Labyrinthes Paramétrables</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Control Panel -->
+            <section class="control-panel">
+                <h2>Paramètres de Génération</h2>
+                
+                <div class="control-group">
+                    <label for="widthInput">
+                        Largeur du labyrinthe
+                        <span class="info-tooltip" title="Doit être un nombre impair">ℹ️</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="number" 
+                            id="widthInput" 
+                            min="5" 
+                            max="101" 
+                            step="2" 
+                            value="21"
+                            class="input-field"
+                        >
+                        <span class="input-hint">Valeur: <span id="widthValue">21</span></span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="heightInput">
+                        Hauteur du labyrinthe
+                        <span class="info-tooltip" title="Doit être un nombre impair">ℹ️</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="number" 
+                            id="heightInput" 
+                            min="5" 
+                            max="101" 
+                            step="2" 
+                            value="21"
+                            class="input-field"
+                        >
+                        <span class="input-hint">Valeur: <span id="heightValue">21</span></span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="loopPercentInput">
+                        Pourcentage de boucles
+                        <span class="info-tooltip" title="Augmente la complexité du labyrinthe">ℹ️</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="range" 
+                            id="loopPercentInput" 
+                            min="0" 
+                            max="100" 
+                            value="25"
+                            class="slider"
+                        >
+                        <span class="input-hint">Valeur: <span id="loopPercentValue">25</span>%</span>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="generateBtn" class="btn btn-primary">
+                        ✨ Générer un Labyrinthe
+                    </button>
+                    <button id="downloadBtn" class="btn btn-secondary" disabled>
+                        💾 Télécharger (JSON)
+                    </button>
+                </div>
+
+                <div id="statusMessage" class="status-message"></div>
+            </section>
+
+            <!-- Visualization Panel -->
+            <section class="visualization-panel">
+                <h2>Visualisation</h2>
+                
+                <div class="canvas-container">
+                    <canvas 
+                        id="mazeCanvas" 
+                        width="500" 
+                        height="500"
+                        class="maze-canvas"
+                    ></canvas>
+                </div>
+
+                <div class="canvas-info">
+                    <div class="info-item">
+                        <span class="info-label">Dimensions:</span>
+                        <span id="dimensions">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Cellules couloirs:</span>
+                        <span id="corridorCount">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Cellules murs:</span>
+                        <span id="wallCount">-</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p><strong>Équipe:</strong> Ikram Benchalal, Nada Zina, Aya Haddoun</p>
+                <p><strong>Encadrant:</strong> M. MENEZ</p>
+                <p><small>Algorithme: Prim avec boucles pour labyrinthes complexes</small></p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
