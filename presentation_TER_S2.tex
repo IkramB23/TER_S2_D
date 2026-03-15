@@ -1,0 +1,464 @@
+\documentclass[aspectratio=169, 12pt]{beamer}
+
+%% ====== PACKAGES ======
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric, fit, backgrounds}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{fontawesome5}
+\usepackage{hyperref}
+\usepackage{appendixnumberbeamer}
+\usepackage{pgfpages}
+
+%% ====== MODE NOTES ======
+\setbeameroption{show notes on second screen=right}
+
+%% ====== THEME ======
+\usetheme{Madrid}
+\usecolortheme{default}
+
+% Couleurs UCA
+\definecolor{ucablue}{RGB}{0, 82, 155}
+\definecolor{ucadark}{RGB}{0, 50, 100}
+\definecolor{ucalight}{RGB}{200, 220, 240}
+\definecolor{vertok}{RGB}{40, 160, 60}
+\definecolor{rougeko}{RGB}{200, 40, 40}
+\definecolor{orangewarn}{RGB}{230, 130, 20}
+\definecolor{griscode}{RGB}{245, 245, 245}
+
+\setbeamercolor{palette primary}{bg=ucablue, fg=white}
+\setbeamercolor{palette secondary}{bg=ucadark, fg=white}
+\setbeamercolor{palette tertiary}{bg=ucadark, fg=white}
+\setbeamercolor{structure}{fg=ucablue}
+\setbeamercolor{title}{fg=white, bg=ucablue}
+\setbeamercolor{frametitle}{fg=white, bg=ucablue}
+\setbeamercolor{block title}{bg=ucablue, fg=white}
+\setbeamercolor{block body}{bg=ucalight, fg=black}
+\setbeamercolor{block title alerted}{bg=rougeko, fg=white}
+\setbeamercolor{block body alerted}{bg=red!5, fg=black}
+\setbeamercolor{block title example}{bg=vertok, fg=white}
+\setbeamercolor{block body example}{bg=green!5, fg=black}
+
+%% ====== LISTINGS ======
+\lstset{
+    basicstyle=\ttfamily\scriptsize,
+    backgroundcolor=\color{griscode},
+    frame=single,
+    rulecolor=\color{gray!40},
+    breaklines=true,
+    showstringspaces=false,
+    keywordstyle=\color{ucablue}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!60!black},
+    tabsize=4
+}
+
+%% ====== FOOTLINE ======
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{
+    \leavevmode\hbox{%
+        \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,center]{palette primary}
+            \usebeamerfont{author in head/foot}\insertshortauthor
+        \end{beamercolorbox}%
+        \begin{beamercolorbox}[wd=.34\paperwidth,ht=2.5ex,dp=1ex,center]{palette secondary}
+            \usebeamerfont{title in head/foot}\insertshorttitle
+        \end{beamercolorbox}%
+        \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,right]{palette tertiary}
+            \usebeamerfont{date in head/foot}\insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+        \end{beamercolorbox}%
+    }
+}
+
+%% ====== INFOS ======
+\title[TER S2 -- Groupe D]{Génération de Labyrinthes Pac-Man}
+\subtitle{UE Travaux d'Études et de Recherche -- Semestre 2}
+\author[Groupe D]{Ikram Benchalal \and Nada Zina \and Aya Haddoun}
+\institute[UCA]{Université Côte d'Azur\\Master 1 Informatique -- Parcours IA\\[0.3cm]Superviseur : Gilles Menez}
+\date{13 mars 2026}
+
+\begin{document}
+
+%% TITRE
+\begin{frame}
+\titlepage
+\end{frame}
+
+%% SOMMAIRE
+\begin{frame}{Sommaire}
+\tableofcontents
+\end{frame}
+
+%% ALGORITHMES
+\section{Algorithmes de génération}
+
+\begin{frame}{Vue d'ensemble : DFS vs Prim}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{block}{\centering DFS}
+\centering
+\begin{tikzpicture}[scale=0.32]
+    \fill[black!80] (0,0) rectangle (7,7);
+    \foreach \x/\y in {1/1, 1/2, 1/3, 1/4, 1/5, 2/5, 3/5, 3/4, 3/3, 3/2, 3/1, 4/1, 5/1, 5/2, 5/3, 5/4, 5/5, 4/3}{
+        \fill[white] (\x, \y) rectangle ++(1,1);
+    }
+\end{tikzpicture}
+\small Longs couloirs sinueux
+\end{block}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{block}{\centering Prim}
+\centering
+\begin{tikzpicture}[scale=0.32]
+    \fill[black!80] (0,0) rectangle (7,7);
+    \foreach \x/\y in {1/1, 2/1, 3/1, 3/2, 3/3, 1/3, 2/3, 4/3, 5/3, 1/4, 1/5, 2/5, 3/5, 5/1, 5/2, 5/4, 5/5, 4/5}{
+        \fill[white] (\x, \y) rectangle ++(1,1);
+    }
+\end{tikzpicture}
+\small Structure étalée
+\end{block}
+\end{column}
+\end{columns}
+\vspace{0.3cm}
+\centering
+\small \textcolor{ucablue}{\faArrowRight} Les deux génèrent des labyrinthes \textbf{parfaits}
+\end{frame}
+
+\begin{frame}{Ajout de boucles}
+\centering
+\begin{tikzpicture}[scale=0.35]
+    \node[font=\small\bfseries, ucablue] at (2, 5) {0\% boucles};
+    \fill[black!80] (0,0) rectangle (4,4);
+    \foreach \x/\y in {1/1, 1/2, 1/3, 2/3, 3/3, 3/2, 3/1}{
+        \fill[white] (\x, \y) rectangle ++(1,1);
+    }
+    
+    \draw[-{Stealth}, thick, vertok] (4.5, 2) -- (6, 2);
+    
+    \node[font=\small\bfseries, vertok] at (8, 5) {25\% boucles};
+    \fill[black!80] (6.5,0) rectangle (10.5,4);
+    \foreach \x/\y in {7.5/1, 7.5/2, 7.5/3, 8.5/3, 9.5/3, 9.5/2, 9.5/1}{
+        \fill[white] (\x, \y) rectangle ++(1,1);
+    }
+    \fill[green!50] (8.5,1) rectangle ++(1,1);
+\end{tikzpicture}
+
+\vspace{0.3cm}
+\small Pac-Man $\approx$ 25\% ~\textbar~ Trop ouvert $>$ 50\%
+\end{frame}
+
+%% API
+\section{Web Service \& API}
+
+\begin{frame}{Architecture globale}
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=2.5cm, minimum height=1.5cm, align=center, font=\small, thick},
+    arr/.style={-{Stealth[length=3mm]}, very thick, ucablue}
+]
+    \node[box, fill=gray!10] (client) at (0, 0) {\faDesktop\\[0.1cm]\textbf{Client}};
+    \node[font=\Large] (net) at (3.5, 0) {\faGlobe};
+    \node[box, fill=green!10] (render) at (7, 0) {\faCloud\\[0.1cm]\textbf{Render}};
+    \node[box, fill=ucalight] (flask) at (11, 0) {\faPython\\[0.1cm]\textbf{Flask}};
+    \node[box, fill=orange!10] (gen) at (11, -2.5) {\faDice\\[0.1cm]\textbf{Prim}};
+    \node[box, fill=yellow!10] (json) at (3.5, -2.5) {\faFileCode\\[0.1cm]\textbf{JSON}};
+    
+    \draw[arr] (client) -- (net);
+    \draw[arr] (net) -- (render);
+    \draw[arr] (render) -- (flask);
+    \draw[arr] (flask) -- (gen);
+    \draw[arr, orange] (gen) -| (json);
+    \draw[arr, orange] (json) -- (client);
+\end{tikzpicture}
+
+\vspace{0.3cm}
+\small \textcolor{ucablue}{\texttt{https://ter-s2-d.onrender.com/maze?width=21\&height=21\&loop\_percent=25}}
+\end{frame}
+
+\begin{frame}[fragile]{API : Routes \& JSON}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{block}{\small Routes}
+\begin{tabular}{ll}
+\texttt{GET /} & Health check \\
+\texttt{GET /maze} & Générer un maze \\
+\end{tabular}
+
+\vspace{0.2cm}
+\textbf{Paramètres}:
+\begin{tabular}{lll}
+\texttt{width} & int & 21 \\
+\texttt{height} & int & 21 \\
+\texttt{loop\_percent} & int & 25 \\
+\end{tabular}
+\end{block}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{block}{\small Réponse JSON}
+\begin{lstlisting}[language=Python]
+{
+  "width": 21,
+  "height": 21,
+  "loop_percent": 25,
+  "maze": [[0,1,0,...], ...]
+}
+\end{lstlisting}
+\end{block}
+\small 0 = mur, 1 = couloir
+\end{column}
+\end{columns}
+\end{frame}
+
+%% TESTS
+\section{Tests \& CI/CD}
+
+\begin{frame}{Tests : 4 niveaux}
+\centering
+\begin{tikzpicture}[
+    testlevel/.style={draw, rounded corners, minimum width=3cm, minimum height=0.8cm, font=\small, align=center},
+    arr/.style={-{Stealth[length=2mm]}, thick, gray}
+]
+    \node[testlevel, fill=ucalight] (func) at (0, 0) {Tests fonctionnels};
+    \node[testlevel, fill=green!10] (struct) at (4, 0) {Tests structurels};
+    \node[testlevel, fill=orange!10] (api) at (0, -1.5) {Tests API locale};
+    \node[testlevel, fill=red!10] (e2e) at (4, -1.5) {Tests cloud};
+    
+    \draw[arr] (func) -- (struct);
+    \draw[arr] (func) -- (api);
+    \draw[arr] (api) -- (e2e);
+    \draw[arr] (struct) -- (e2e);
+    
+    \node[font=\tiny, ucablue, above=0.1cm of func] {\faCheckCircle~6};
+    \node[font=\tiny, ucablue, above=0.1cm of struct] {\faCheckCircle~4};
+    \node[font=\tiny, ucablue, below=0.1cm of api] {\faCheckCircle~5};
+    \node[font=\tiny, ucablue, below=0.1cm of e2e] {\faCheckCircle~tests};
+    
+    \node[draw=vertok, thick, rounded corners, fill=green!10, font=\bfseries, below=0.5cm of api] {\textcolor{vertok}{\faCheck}~15 tests total};
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{CI/CD : GitHub Actions}
+\centering
+\begin{tikzpicture}[scale=0.85,
+    box/.style={draw, rounded corners, minimum width=1.8cm, minimum height=0.9cm, align=center, font=\small, thick},
+    arr/.style={-{Stealth[length=3mm]}, very thick}
+]
+    \node[box, fill=gray!20] (push) at (0, 0) {\faCodeBranch\\git push};
+    \node[box, fill=ucalight] (test) at (2.5, 0) {\faCog\\Test\\15};
+    \node[diamond, draw, thick, fill=yellow!20, minimum size=0.8cm, inner sep=0pt, font=\tiny] (check) at (4.5, 0) {OK?};
+    \node[box, fill=green!15] (deploy) at (6.5, 0) {\faCloud\\Deploy};
+    \node[box, fill=vertok!20] (render) at (8.5, 0) {\faServer\\Render};
+    
+    \draw[arr, ucablue] (push) -- (test);
+    \draw[arr, ucablue] (test) -- (check);
+    \draw[arr, vertok] (check) -- node[above, font=\tiny, vertok] {\faCheck} (deploy);
+    \draw[arr, vertok] (deploy) -- (render);
+    \draw[arr, rougeko] (check) -- ++(0, -0.9) node[below, font=\tiny, rougeko] {\faTimes~STOP};
+\end{tikzpicture}
+\end{frame}
+
+%% INTERFACE
+\section{Interface graphique}
+
+\begin{frame}{Interface graphique -- Architecture}
+\centering
+\vspace{-0.3cm}
+\begin{tikzpicture}[scale=1, 
+    component/.style={draw, rounded corners, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small\bfseries, thick},
+    layer/.style={draw, rounded corners, minimum width=8cm, minimum height=1.3cm, align=center, thick, dashed},
+    arr/.style={-{Stealth[length=2.5mm]}, very thick}
+]
+    % FRONTEND LAYER
+    \node[layer, fill=ucalight!20, draw=ucablue] (frontend_box) at (5, 4.5) {};
+    \node[component, fill=ucalight, draw=ucablue, line width=2pt] (html) at (2, 4.5) {\faFileAlt\\HTML5\\136 L};
+    \node[component, fill=ucalight, draw=ucablue, line width=2pt] (css) at (5, 4.5) {\faPalette\\CSS3\\650+ L};
+    \node[component, fill=ucalight, draw=ucablue, line width=2pt] (js) at (8, 4.5) {\faCode\\JavaScript\\400+ L};
+    \node[anchor=south west, font=\tiny\bfseries, ucablue] at (1.2, 5.3) {FRONTEND};
+    
+    % API LAYER
+    \node[component, fill=vertok!20, draw=vertok, line width=2.5pt, minimum width=7.5cm] (api) at (5, 2.8) {\faRocket\quad\textbf{API REST -- fetch() async/await}};
+    
+    % ARROWS DOWN
+    \draw[arr, ucablue] (html) -- (2, 3.8);
+    \draw[arr, ucablue] (css) -- (5, 3.8);
+    \draw[arr, ucablue] (js) -- (8, 3.8);
+    
+    % BACKEND LAYER
+    \node[component, fill=orange!15, draw=orangewarn, line width=2.5pt, minimum width=7.5cm] (backend) at (5, 1.2) {\faDice\quad\textbf{Backend Flask -- Algorithme Prim + Boucles}};
+    
+    % ARROWS DOWN
+    \draw[arr, vertok, dashed, line width=2pt] (api) -- (backend);
+    
+\end{tikzpicture}
+
+\vspace{0.4cm}
+\begin{columns}[T]
+\begin{column}{0.33\textwidth}
+\begin{block}{\tiny \faFileAlt~HTML5}
+Formulaires\\
+Canvas 500×500\\
+Stats dynamiques
+\end{block}
+\end{column}
+\begin{column}{0.33\textwidth}
+\begin{block}{\tiny \faPalette~CSS3}
+Responsive design\\
+2 col desktop\\
+Animations fluides
+\end{block}
+\end{column}
+\begin{column}{0.34\textwidth}
+\begin{block}{\tiny \faCode~JS + Fetch}
+Validation\\
+Appel async\\
+Rendu canvas 2D
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Implémentation technique}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{block}{\small \faFileAlt~HTML5}
+\begin{itemize}
+    \item Input width 5-101
+    \item Input height 5-101
+    \item Slider boucles 0-100\%
+    \item Canvas 500×500
+    \item Stats dynamiques
+\end{itemize}
+\end{block}
+
+\begin{block}{\small \faPalette~CSS3}
+\begin{itemize}
+    \item 2 colonnes desktop
+    \item 1 colonne mobile
+    \item Gradients modernes
+    \item Animations fluides
+\end{itemize}
+\end{block}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{block}{\small \faCode~JavaScript}
+\begin{enumerate}
+    \item Validation inputs
+    \item Appel API async
+    \item Rendu canvas 2D
+    \item Calcul stats
+    \item Export PNG/JSON
+\end{enumerate}
+\end{block}
+
+\begin{block}{\small Gestion erreurs}
+\begin{itemize}
+    \item try/catch fetch
+    \item Messages utilisateur
+    \item Status HTTP
+\end{itemize}
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Flux utilisateur}
+\begin{columns}[T]
+\begin{column}{0.45\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.8, node distance=0.6cm]
+    \node[rectangle, draw=ucablue, fill=ucalight, minimum width=3cm, minimum height=0.4cm, font=\small\bfseries] (s1) {Saisir paramètres};
+    \node[rectangle, draw=ucablue, fill=ucalight, minimum width=3cm, minimum height=0.4cm, font=\small\bfseries, below=of s1] (s2) {Valider entrées};
+    \node[rectangle, draw=vertok, fill=green!15, minimum width=3cm, minimum height=0.4cm, font=\small\bfseries, below=of s2] (s3) {API /maze};
+    \node[rectangle, draw=ucablue, fill=ucalight, minimum width=3cm, minimum height=0.4cm, font=\small\bfseries, below=of s3] (s4) {JSON response};
+    \node[rectangle, draw=vertok, fill=green!15, minimum width=3cm, minimum height=0.4cm, font=\small\bfseries, below=of s4] (s5) {Rendu canvas};
+    \node[rectangle, draw=vertok, fill=green!15, minimum width=3cm, minimum height=0.4cm, font=\small\bfseries, below=of s5] (s6) {Stats affichées};
+    
+    \draw[-{Stealth}, thick, ucablue] (s1) -- (s2);
+    \draw[-{Stealth}, thick, ucablue] (s2) -- (s3);
+    \draw[-{Stealth}, thick, ucablue] (s3) -- (s4);
+    \draw[-{Stealth}, thick, ucablue] (s4) -- (s5);
+    \draw[-{Stealth}, thick, ucablue] (s5) -- (s6);
+    
+    \draw[dashed, rougeko, thick] (s2) edge[bend right=30] (s1);
+\end{tikzpicture}
+\end{column}
+
+\begin{column}{0.50\textwidth}
+\textbf{Fonctionnalités}
+
+\begin{alertblock}{\small \faDesktop~Responsive}
+\begin{itemize}
+    \item Desktop 2 col
+    \item Tablet adapté
+    \item Mobile lisible
+\end{itemize}
+\end{alertblock}
+
+\begin{block}{\small \faSave~Export}
+\begin{itemize}
+    \item PNG image
+    \item JSON données
+\end{itemize}
+\end{block}
+
+\begin{block}{\small \faChartLine~UX}
+\begin{itemize}
+    \item Temps réel
+    \item Animations
+    \item Feedback clairs
+\end{itemize}
+\end{block}
+\end{column}
+\end{columns}
+\end{frame}
+
+%% COLLABORATION
+\section{Projet \& Collaboration}
+
+\begin{frame}{Répartition \& Collaboration}
+\centering
+\begin{tikzpicture}[
+    member/.style={draw, rounded corners, minimum width=2.8cm, minimum height=0.9cm, align=center, font=\small, thick},
+    task/.style={font=\scriptsize, anchor=west}
+]
+    \node[member, fill=blue!10] (ikram) at (0, 2) {\faUser\\\textbf{Ikram}};
+    \node[task] at (2, 2.6) {$\bullet$ DFS + Prim};
+    \node[task] at (2, 2.2) {$\bullet$ Tests (15)};
+    \node[task] at (2, 1.8) {$\bullet$ CI/CD};
+    
+    \node[member, fill=green!10] (nada) at (0, 0.5) {\faUser\\\textbf{Nada}};
+    \node[task] at (2, 1.1) {$\bullet$ API Flask};
+    \node[task] at (2, 0.7) {$\bullet$ Déploiement};
+    
+    \node[member, fill=orange!10] (aya) at (0, -1) {\faUser\\\textbf{Aya}};
+    \node[task] at (2, -0.4) {$\bullet$ Interface GUI};
+    \node[task] at (2, -0.8) {$\bullet$ UX Design};
+    
+    \node[draw, dashed, rounded corners, fill=gray!5, minimum width=3.5cm, font=\tiny, align=center] at (8, 0.5) {
+        \faGithub~GitHub\\[0.1cm]
+        Repo: IkramB23\\
+        Branch: main\\
+        Prof: gmenez
+    };
+\end{tikzpicture}
+\end{frame}
+
+%% FIN
+\begin{frame}{}
+\centering
+\vspace{2cm}
+{\Huge\textcolor{ucablue}{Merci !}}\\[1cm]
+{\large Questions ?}\\[0.5cm]
+{\small\textcolor{gray}{\faGithub~github.com/IkramB23/TER\_S2\_D}}\\
+{\small\textcolor{gray}{\faGlobe~ter-s2-d.onrender.com}}
+\end{frame}
+
+\end{document}
