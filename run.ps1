@@ -32,8 +32,8 @@ Write-Host ""
 
 # Check if requirements are installed
 Write-Host "[INFO] Verification des dependances..." -ForegroundColor Blue
-$FlaskInstalled = pip show flask 2>$null
-if (-not $FlaskInstalled) {
+$PygameInstalled = pip show pygame 2>$null
+if (-not $PygameInstalled) {
     Write-Host "[INFO] Installation des dependances..." -ForegroundColor Blue
     pip install -r requirements.txt
     if ($LASTEXITCODE -ne 0) {
@@ -46,17 +46,17 @@ if (-not $FlaskInstalled) {
 Write-Host "[OK] Dependances verifiees" -ForegroundColor Green
 Write-Host ""
 
-# Start the application
-Write-Host "[INFO] Demarrage de l'application..." -ForegroundColor Blue
+# Start the local interface
+Write-Host "[INFO] Demarrage de l'interface locale..." -ForegroundColor Blue
 Write-Host ""
 Write-Host "===============================================" -ForegroundColor Green
-Write-Host "   L'application est accessible sur:" -ForegroundColor Green
-Write-Host "   http://localhost:5000" -ForegroundColor Cyan
-Write-Host "   " -ForegroundColor Green
-Write-Host "   Appuyez sur Ctrl+C pour arreter" -ForegroundColor Yellow
+Write-Host "   Pac-Man local (sans fantomes)" -ForegroundColor Green
+Write-Host "   Fleches/WASD: bouger" -ForegroundColor Cyan
+Write-Host "   N: nouveau labyrinthe, [ ]: changer" -ForegroundColor Cyan
+Write-Host "   Ctrl+C pour arreter" -ForegroundColor Yellow
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host ""
 
-python app.py
+python local_pacman.py
 
 Read-Host "Appuyez sur Entree pour terminer"

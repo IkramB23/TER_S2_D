@@ -36,7 +36,7 @@ echo.
 
 REM Check if requirements are installed
 echo [INFO] Verification des dependances...
-pip show flask >nul 2>&1
+pip show pygame >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Installation des dependances...
     pip install -r requirements.txt
@@ -50,17 +50,17 @@ if errorlevel 1 (
 echo [OK] Dependances verifiees
 echo.
 
-REM Start the application
-echo [INFO] Demarrage de l'application...
+REM Start the local interface
+echo [INFO] Demarrage de l'interface locale...
 echo.
 echo ===============================================
-echo   L'application est accessible sur:
-echo   http://localhost:5000
-echo   
+echo   Pac-Man local (sans fantomes)
+echo   Fleches/WASD: bouger
+echo   N: nouveau labyrinthe, [ ]: changer
 echo   Appuyez sur Ctrl+C pour arreter
 echo ===============================================
 echo.
 
-python app.py
+python local_pacman.py
 
 pause

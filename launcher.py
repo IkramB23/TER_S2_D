@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Générateur de Labyrinthes Pac-Man - Launcher
+Générateur de Labyrinthes Pac-Man - Launcher local
 TER S2 - Groupe D (Ikram, Nada, Aya)
 
-Ce script démarre l'application web du générateur de labyrinthes.
-Il vérifie les dépendances et lance Flask sur http://localhost:5000
+Ce script démarre l'interface locale type Pac-Man (pygame).
 """
 
 import sys
 import os
 import subprocess
-import platform
 from pathlib import Path
 
 def print_header():
@@ -33,7 +31,7 @@ def check_dependencies():
     """Check and install required packages"""
     print("[INFO] Vérification des dépendances...")
     
-    required_packages = ['flask']
+    required_packages = ['pygame']
     missing_packages = []
     
     for package in required_packages:
@@ -69,19 +67,18 @@ def main():
     script_dir = Path(__file__).parent.absolute()
     os.chdir(script_dir)
     
-    # Launch Flask app
-    print("[INFO] Démarrage de l'application...\n")
+    # Launch local game
+    print("[INFO] Démarrage de l'interface locale...\n")
     print("=" * 50)
-    print("   L'application est accessible sur:")
-    print("   http://localhost:5000")
-    print()
-    print("   Appuyez sur Ctrl+C pour arrêter")
+    print("   Interface locale Pac-Man")
+    print("   Contrôles: flèches/WASD pour bouger")
+    print("   N: nouveau labyrinthe, [ ]: changer")
     print("=" * 50 + "\n")
     
-    # Import and run Flask app
+    # Import and run local game
     try:
-        from app import app
-        app.run(debug=False, host='0.0.0.0', port=5000)
+        from local_pacman import main as run_local_game
+        run_local_game()
     except KeyboardInterrupt:
         print("\n[INFO] Application arrêtée par l'utilisateur")
         sys.exit(0)
