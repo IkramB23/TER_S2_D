@@ -1,7 +1,5 @@
 flask
 gunicorn
 pytest
-pygame
 pymongo
 dnspython
-requests
