@@ -1,0 +1,1042 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+
+\geometry{margin=2.5cm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    urlcolor=blue!70!black
+}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    rulecolor=\color{gray!40},
+    breaklines=true,
+    showstringspaces=false,
+    keywordstyle=\color{blue!70!black}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!60!black}
+}
+
+\newtcolorbox{definitionbox}[1][]{
+    colback=blue!5,
+    colframe=blue!40!black,
+    title={\textbf{Définition}},
+    fonttitle=\bfseries,
+    #1
+}
+
+\newtcolorbox{choixbox}[1][]{
+    colback=green!5,
+    colframe=green!40!black,
+    title={\textbf{Justification du choix}},
+    fonttitle=\bfseries,
+    #1
+}
+
+\newtcolorbox{problemebox}[1][]{
+    colback=red!5,
+    colframe=red!40!black,
+    title={\textbf{Problème rencontré}},
+    fonttitle=\bfseries,
+    #1
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small TER S2 -- Groupe D}
+\fancyhead[R]{\small Guide de Présentation}
+\fancyfoot[C]{\thepage}
+
+\titleformat{\section}{\Large\bfseries\color{blue!70!black}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{blue!50!black}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{blue!30!black}}{\thesubsubsection}{1em}{}
+
+\title{
+    \vspace{-1cm}
+    {\Huge\bfseries Guide de Présentation}\\[0.5cm]
+    {\Large TER S2 -- Groupe D}\\[0.3cm]
+    {\large Génération de Labyrinthes Pac-Man}\\[0.5cm]
+    {\normalsize Ikram Benchalal $\cdot$ Nada Zina $\cdot$ Aya Haddoun}\\
+    {\normalsize Encadrant : M. Menez}
+}
+\date{Mars 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%% ====================================================================
+\section{Le projet en une phrase}
+%% ====================================================================
+
+On a créé un \textbf{générateur de labyrinthes Pac-Man} : un programme qui fabrique des labyrinthes jouables (avec des boucles, pas trop de culs-de-sac), accessible à travers internet via une API, testé automatiquement, et déployé dans le cloud.
+
+%% ====================================================================
+\section{Partie Algo -- Exploration DFS vs Prim}
+%% ====================================================================
+
+\subsection{C'est quoi un labyrinthe ``parfait'' ?}
+
+Un labyrinthe \textbf{parfait} = il y a \textbf{un seul chemin} entre chaque paire de cases. Pas de boucle, pas de raccourci. C'est comme un arbre en informatique.
+
+\textbf{Problème pour Pac-Man} : on a besoin de \textbf{boucles} (plusieurs chemins possibles) pour que les fantômes ne piègent pas le joueur dans un cul-de-sac.
+
+% --------------------------------------------------
+\subsection{Algorithme DFS (Depth-First Search) -- Ikram}
+
+\begin{definitionbox}
+\textbf{DFS} = ``Recherche en profondeur''. On part d'une case, on creuse le plus loin possible dans une direction, et quand on est bloqué, on revient en arrière (\textit{backtracking}) pour essayer un autre chemin.
+\end{definitionbox}
+
+\textbf{Comment ça marche} :
+\begin{enumerate}
+    \item On démarre à la case (1,1)
+    \item On choisit une direction au hasard (haut / bas / gauche / droite)
+    \item Si la case 2 pas plus loin est un mur $\rightarrow$ on creuse (on met les 2 cases à 1 = couloir)
+    \item On recommence depuis la nouvelle case
+    \item Si on est bloqué $\rightarrow$ on revient en arrière
+\end{enumerate}
+
+\textbf{Résultat} : des couloirs \textbf{longs et sinueux}, beaucoup de culs-de-sac, peu d'intersections.
+
+\textbf{Fichier} : \texttt{Proto/maze\_dfs.py} -- fait par \textbf{Ikram}
+
+% --------------------------------------------------
+\subsection{Algorithme de Prim -- Nada}
+
+\begin{definitionbox}
+\textbf{Prim} vient de la théorie des graphes (algorithme d'arbre couvrant minimum). Ici adapté pour les labyrinthes : au lieu de creuser en profondeur, on maintient une \textbf{liste de tous les murs candidats} et on en choisit un \textbf{au hasard} à chaque étape.
+\end{definitionbox}
+
+\textbf{Comment ça marche} :
+\begin{enumerate}
+    \item On choisit une case de départ au hasard
+    \item On ajoute tous ses murs voisins dans une \textbf{liste}
+    \item On pioche un mur au hasard dans la liste
+    \item Si la case de l'autre côté du mur est encore non visitée $\rightarrow$ on l'ouvre
+    \item On ajoute les nouveaux murs voisins à la liste
+    \item On recommence jusqu'à ce que la liste soit vide
+\end{enumerate}
+
+\textbf{Résultat} : des couloirs \textbf{plus courts et étalés}, plus d'intersections, structure plus ``ouverte''.
+
+\textbf{Fichiers} :
+\begin{itemize}
+    \item \texttt{Proto/maze\_Prim.py} -- fait par \textbf{Nada} (version originale, convention inversée)
+    \item \texttt{Proto/maze\_Prim\_loops.py} -- fait par \textbf{Ikram} (adapté de Nada, convention corrigée + boucles)
+\end{itemize}
+
+% --------------------------------------------------
+\subsection{Comparaison : Pourquoi Prim est mieux pour Pac-Man ?}
+
+On a fait un \textbf{benchmark} (\texttt{Proto/maze\_analyzer.py} -- \textbf{Ikram}) qui compare les deux algorithmes sur 10 labyrinthes 31$\times$31 :
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Métrique} & \textbf{DFS} & \textbf{Prim} & \textbf{Mieux pour Pac-Man} \\
+\midrule
+Culs-de-sac & Beaucoup & Moins & \textbf{Prim} (moins de pièges) \\
+Intersections & Peu & Plus & \textbf{Prim} (plus de choix) \\
+Plus long chemin & Très long & Moyen & \textbf{Prim} (plus équilibré) \\
+Boucles (à 25\%) & Pareil & Pareil & Égal \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{choixbox}
+\textbf{Prim} donne des labyrinthes plus adaptés à Pac-Man car ils ont plus d'intersections (carrefours) et moins de culs-de-sac (impasses). Les fantômes et le joueur ont plus de choix de mouvements.
+\end{choixbox}
+
+% --------------------------------------------------
+\subsection{Les boucles (\texttt{add\_loops})}
+
+Un labyrinthe parfait n'a \textbf{aucune boucle}. Pour Pac-Man on en a besoin. La fonction \texttt{add\_loops(maze, loop\_percent)} :
+
+\begin{enumerate}
+    \item Trouve tous les murs qui sont \textbf{entre deux couloirs} (horizontal ou vertical)
+    \item En supprime un pourcentage (ex: 40\%) choisi au hasard
+    \item Ça crée des chemins alternatifs $\rightarrow$ des boucles
+\end{enumerate}
+
+Le paramètre \texttt{loop\_percent} contrôle l'ouverture :
+\begin{itemize}
+    \item \textbf{0\%} = labyrinthe parfait (beaucoup de culs-de-sac)
+    \item \textbf{25\%} = bon équilibre pour Pac-Man
+    \item \textbf{50\%+} = trop ouvert, plus vraiment un labyrinthe
+\end{itemize}
+
+% --------------------------------------------------
+\subsection{Convention des valeurs}
+
+\begin{itemize}
+    \item \textbf{0 = mur} (case noire, bloquée)
+    \item \textbf{1 = couloir} (case blanche, on peut marcher dessus)
+\end{itemize}
+
+\begin{problemebox}
+Nada avait la convention inversée (1=mur, 0=couloir) dans \texttt{maze\_Prim.py}. \textbf{Solution} : Ikram a créé \texttt{maze\_Prim\_loops.py} en adaptant le code avec la bonne convention pour que tout le projet soit cohérent.
+\end{problemebox}
+
+%% ====================================================================
+\section{Partie Graphique -- \texttt{Gallery/best\_ascii.png}}
+%% ====================================================================
+
+\textbf{Fichier} : \texttt{Gallery/best\_ascii.png} -- fait par \textbf{Ikram}
+
+C'est une image du ``meilleur'' labyrinthe qu'on a généré. Processus de sélection :
+
+\begin{enumerate}
+    \item On a généré \textbf{100 labyrinthes} avec Prim à 40\% de boucles
+    \item On a noté chacun avec un score qui pénalise les \textbf{îlots} (blocs de murs isolés, visuellement moches et inutiles)
+    \item On a gardé le meilleur : celui avec le moins d'îlots, bon ratio couloirs/murs, assez de culs-de-sac et d'intersections
+\end{enumerate}
+
+\textbf{Caractéristiques du labyrinthe sélectionné} : 40\% boucles, 20 culs-de-sac, 298 intersections, 67.4\% de couloirs, 116 îlots de murs isolés.
+
+%% ====================================================================
+\section{Partie Implémentation -- Choix techniques}
+%% ====================================================================
+
+\subsection{Langage : Python}
+
+\begin{choixbox}
+Pourquoi Python ? Simple, rapide à prototyper, bibliothèques disponibles (Flask pour le web), et le prof l'utilise dans le cours.
+\end{choixbox}
+
+\subsection{Structure des fichiers sur GitHub}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Fichier} & \textbf{Fait par} & \textbf{Contenu} \\
+\midrule
+\texttt{Proto/maze\_dfs.py} & Ikram & Générateur DFS + boucles \\
+\texttt{Proto/maze\_Prim.py} & Nada & Générateur Prim (classe, convention inversée) \\
+\texttt{Proto/maze\_Prim\_loops.py} & Ikram (adapté) & Générateur Prim + boucles (version finale) \\
+\texttt{Proto/maze\_analyzer.py} & Ikram & Benchmark DFS vs Prim (métriques) \\
+\texttt{Proto/Benchmark\_prim.py} & Nada & Benchmark de Prim seul \\
+\texttt{local_pacman.py} & Nada + Ikram & Interface Locale Pygame (Aperçu du jeu) \\
+\texttt{tests/test\_maze\_generator.py} & Ikram & 10 tests du générateur \\
+\texttt{tests/test\_app\_local.py} & Ikram & 5 tests de l'API en local \\
+\texttt{test\_api\_cloud.py} & Nada & Tests API sur Render (cloud) \\
+\texttt{test\_Lab\_properties.py} & Nada & Tests des propriétés du labyrinthe \\
+\texttt{.github/workflows/ci.yml} & Ikram & Pipeline CI/CD \\
+\texttt{Gallery/best\_ascii.png} & Ikram & Image du meilleur labyrinthe \\
+\texttt{requirements.txt} & Nada & Dépendances Python (flask, gunicorn, pytest) \\
+\texttt{README.md} & Commun & Description du projet \\
+\texttt{.gitignore} & Ikram & Exclusion des fichiers inutiles \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Choix : fonctions vs classes}
+
+\begin{itemize}
+    \item \textbf{Nada} a utilisé une \textbf{classe} \texttt{Maze} dans \texttt{maze\_Prim.py} (programmation orientée objet)
+    \item \textbf{Ikram} a utilisé des \textbf{fonctions} simples dans \texttt{maze\_Prim\_loops.py} et \texttt{maze\_dfs.py} (plus lisible, plus facile à tester et à intégrer avec l'API)
+    \item L'API utilise la version à fonctions car plus simple à importer
+\end{itemize}
+
+\subsection{Dimensions impaires}
+
+Les labyrinthes doivent avoir des dimensions \textbf{impaires} (11, 15, 21...). Pourquoi ? Parce que l'algorithme travaille sur une grille où les cases ``couloir'' sont aux positions impaires (1, 3, 5...) et les murs aux positions paires (0, 2, 4...). Si la taille est paire, la dernière ligne/colonne serait incomplète. La fonction \texttt{generate\_pacman\_maze} force les dimensions impaires automatiquement (\texttt{if width \% 2 == 0: width += 1}).
+
+%% ====================================================================
+\section{Partie Implémentation -- L'API}
+%% ====================================================================
+
+\subsection{C'est quoi une API ?}
+
+\begin{definitionbox}
+\textbf{API} = Application Programming Interface. C'est une ``porte d'entrée'' pour que des programmes puissent communiquer entre eux. Ici, notre API permet à n'importe quel programme (un navigateur, un jeu, une app mobile) de demander un labyrinthe via internet.
+\end{definitionbox}
+
+\subsection{Comment marche notre API ?}
+
+\begin{itemize}
+    \item \textbf{Framework} : Flask (mini-framework Python pour créer des serveurs web)
+    \item \textbf{Fichier} : \texttt{local_pacman.py}
+    \item \textbf{Routes} :
+    \begin{itemize}
+        \item \texttt{GET /} $\rightarrow$ retourne ``Maze Generator API is running''
+        \item \texttt{GET /maze?width=21\&height=21\&loop\_percent=25} $\rightarrow$ retourne un labyrinthe en JSON
+    \end{itemize}
+\end{itemize}
+
+\subsection{C'est quoi JSON ?}
+
+\begin{definitionbox}
+\textbf{JSON} = JavaScript Object Notation. C'est un format de données universel (comme un dictionnaire Python). Lisible par tous les langages de programmation.
+\end{definitionbox}
+
+Notre API retourne :
+\begin{lstlisting}[language=Python]
+{
+  "width": 21,
+  "height": 21,
+  "loop_percent": 25,
+  "maze": [[0,0,0,...], [0,1,1,...], ...]
+}
+\end{lstlisting}
+
+\subsection{C'est quoi Render ?}
+
+\begin{definitionbox}
+\textbf{Render} = un service cloud (hébergeur web). On y met notre code Python, et Render le fait tourner 24h/24 sur un serveur distant. N'importe qui dans le monde peut accéder à \url{https://ter-s2-d.onrender.com/maze} et recevoir un labyrinthe.
+\end{definitionbox}
+
+\begin{itemize}
+    \item \textbf{Pygame} = le serveur qui fait tourner Flask en production (plus robuste que le serveur de développement Flask)
+    \item \textbf{Plan gratuit} = le serveur ``dort'' après 15 min d'inactivité ; le premier appel prend $\sim$30s pour se réveiller
+    \item Le Render est hébergé sur le compte de \textbf{Nada}, connecté au repo \texttt{webNada/TER\_S2\_D}
+\end{itemize}
+
+%% ====================================================================
+\section{Partie Tests (Tâche 4)}
+%% ====================================================================
+
+\subsection{Pourquoi tester ?}
+
+Pour être sûr que le code marche, même après des modifications. Si quelqu'un change quelque chose et casse un truc, les tests le détectent \textbf{immédiatement} (surtout avec le CI automatique).
+
+\subsection{Outil : pytest}
+
+\begin{definitionbox}
+\textbf{pytest} = bibliothèque Python qui lance automatiquement toutes les fonctions commençant par \texttt{test\_} et vérifie que les \texttt{assert} passent. Si un assert échoue $\rightarrow$ le test est rouge.
+\end{definitionbox}
+
+\subsection{Nos 15 tests (dans \texttt{tests/})}
+
+\subsubsection{10 tests du générateur (\texttt{tests/test\_maze\_generator.py} -- Ikram)}
+
+\begin{enumerate}
+    \item \textbf{Dimensions correctes} : un maze 21$\times$21 retourne bien 21 lignes de 21 colonnes
+    \item \textbf{Plusieurs tailles} : marche pour 11, 15, 21, 31
+    \item \textbf{Dimensions forcées impaires} : si on donne 20 $\rightarrow$ le résultat est 21
+    \item \textbf{Contient murs ET couloirs} : le maze n'est pas totalement vide ou plein
+    \item \textbf{Bords = murs} : la première/dernière ligne et colonne sont des murs
+    \item \textbf{Que des 0 et 1} : pas d'autres valeurs dans la grille
+    \item \textbf{add\_loops augmente les couloirs} : après ajout de boucles, il y a plus de cases couloir
+    \item \textbf{add\_loops préserve les bords} : les bords restent des murs après ajout de boucles
+    \item \textbf{Connexité (BFS)} : on peut atteindre \textbf{toutes} les cases couloir depuis n'importe quelle case couloir (pas de zones isolées)
+    \item \textbf{Présence de culs-de-sac} : il y a bien des impasses (preuve que c'est un vrai labyrinthe)
+\end{enumerate}
+
+\subsubsection{5 tests de l'API locale (\texttt{tests/test\_app\_local.py} -- Ikram)}
+
+\begin{enumerate}
+    \item La route \texttt{/} répond avec le code 200 (OK)
+    \item \texttt{/maze} retourne un 21$\times$21 par défaut
+    \item La taille personnalisée (\texttt{?width=15\&height=15}) fonctionne
+    \item La réponse est du JSON valide avec les clés \texttt{width}, \texttt{height}, \texttt{maze}
+    \item Le maze ne contient que des 0 et 1
+\end{enumerate}
+
+\subsubsection{Tests cloud (par Nada -- pas dans le CI)}
+
+\begin{itemize}
+    \item \texttt{test\_api\_cloud.py} : teste les dimensions et les couloirs sur \url{https://ter-s2-d.onrender.com}
+    \item \texttt{test\_Lab\_properties.py} : teste que le labyrinthe contient bien des couloirs
+\end{itemize}
+
+Ces tests ne sont pas dans le CI car ils dépendent de Render (le serveur peut être en veille).
+
+%% ====================================================================
+\section{CI/CD (Tâche 5)}
+%% ====================================================================
+
+\subsection{C'est quoi CI/CD ?}
+
+\begin{definitionbox}
+\textbf{CI} = Continuous Integration (Intégration Continue) : à chaque \texttt{git push}, les tests sont lancés \textbf{automatiquement} sur un serveur distant (GitHub). Si un test échoue $\rightarrow$ on est alerté immédiatement.
+\end{definitionbox}
+
+\begin{definitionbox}
+\textbf{CD} = Continuous Deployment (Déploiement Continu) : si les tests passent, le code est \textbf{déployé automatiquement} sur le serveur de production (Render). Pas besoin de déployer manuellement.
+\end{definitionbox}
+
+\subsection{Outil : GitHub Actions}
+
+\begin{definitionbox}
+\textbf{GitHub Actions} = service intégré à GitHub qui exécute des scripts (``workflows'') automatiquement quand un événement se produit (push, pull request...). Gratuit pour les repos publics et privés.
+\end{definitionbox}
+
+\subsection{Notre pipeline (\texttt{.github/workflows/ci.yml} -- Ikram)}
+
+Le fonctionnement en schéma :
+
+\begin{center}
+\fbox{Push sur main} $\rightarrow$ \fbox{Job ``test'' (15 tests pytest)} $\rightarrow$ \checkmark $\rightarrow$ \fbox{Job ``deploy'' (curl deploy hook)} $\rightarrow$ \fbox{Render se redéploie}
+\end{center}
+
+\textbf{Étapes du job test} :
+\begin{enumerate}
+    \item Checkout du code (récupère le repo)
+    \item Installation de Python 3.10
+    \item Installation des dépendances (\texttt{pip install -r requirements.txt})
+    \item Lancement de \texttt{pytest tests/ -v} (les 15 tests)
+\end{enumerate}
+
+\textbf{Étapes du job deploy} :
+\begin{enumerate}
+    \item Attend que les tests passent (\texttt{needs: test})
+    \item Appelle l'URL du deploy hook de Render avec \texttt{curl}
+    \item Render récupère le dernier code et redéploie le serveur
+\end{enumerate}
+
+\subsection{C'est quoi un Deploy Hook ?}
+
+\begin{definitionbox}
+\textbf{Deploy Hook} = une URL secrète fournie par Render. Quand on fait une requête HTTP (\texttt{curl}) sur cette URL, Render lance un nouveau déploiement automatiquement. On la stocke dans les \textbf{Secrets} GitHub pour ne pas l'exposer dans le code source.
+\end{definitionbox}
+
+\subsection{Démo rouge / vert}
+
+On a fait une démonstration pour prouver que le CI détecte les erreurs :
+\begin{enumerate}
+    \item On a \textbf{cassé un test exprès} : \texttt{assert len(maze) == 99} au lieu de 21 $\rightarrow$ CI \textbf{rouge} \textcolor{red}{$\boldsymbol{\times}$}
+    \item On a \textbf{réparé le test} : \texttt{assert len(maze) == 21} $\rightarrow$ CI \textbf{vert} \textcolor{green!60!black}{$\boldsymbol{\checkmark}$}
+\end{enumerate}
+
+Ça montre que le pipeline détecte les régressions et protège la branche \texttt{main}.
+
+%% ====================================================================
+\section{Partie Projet -- GitHub \& Collaboration}
+%% ====================================================================
+
+\subsection{Organisation du dépôt}
+
+\begin{itemize}
+    \item \textbf{Repo principal} : \texttt{IkramB23/TER\_S2\_D} (le prof \texttt{gmenez} y a accès en tant que collaborateur)
+    \item \textbf{Fork de Nada} : \texttt{webNada/TER\_S2\_D} (lié à Render pour le déploiement)
+    \item Les deux repos sont \textbf{synchronisés} : le code est identique
+\end{itemize}
+
+\subsection{Branches utilisées}
+
+\begin{itemize}
+    \item \texttt{main} : branche principale, toujours stable, c'est celle qui est déployée
+    \item \texttt{ikram-work}, \texttt{nada\_work} : branches de travail individuelles
+    \item \texttt{ci-cd-setup} : branche temporaire pour mettre en place le CI/CD
+\end{itemize}
+
+\subsection{Répartition du travail}
+
+\begin{itemize}
+    \item \textbf{Ikram} : exploration DFS, adaptation Prim avec boucles, benchmark comparatif, tests (15), CI/CD, Gallery, synchronisation des repos
+    \item \textbf{Nada} : exploration Prim (original), Interface Pygame, Tests locaux, SQLite
+    \item \textbf{Aya} : interface graphique (à venir)
+\end{itemize}
+
+\subsection{Problèmes rencontrés et résolutions}
+
+\begin{problemebox}[title=\textbf{Problème 1 : Convention inversée (0 vs 1)}]
+Nada utilisait 1=mur, 0=couloir dans \texttt{maze\_Prim.py}. Le reste du projet utilisait 0=mur, 1=couloir.\\
+\textbf{Solution} : Ikram a créé \texttt{maze\_Prim\_loops.py} en adaptant le code de Nada avec la bonne convention.
+\end{problemebox}
+
+\begin{problemebox}[title=\textbf{Problème 2 : Conflit de noms de fichiers}]
+Nada avait \texttt{maze\_Prim.py}, Ikram avait aussi un \texttt{maze\_prim.py} $\rightarrow$ conflit au merge.\\
+\textbf{Solution} : renommé en \texttt{maze\_Prim\_loops.py} pour distinguer les deux versions.
+\end{problemebox}
+
+\begin{problemebox}[title=\textbf{Problème 3 : \texttt{\_\_pycache\_\_} dans le repo}]
+Des fichiers \texttt{.pyc} (fichiers compilés Python) étaient poussés sur GitHub par erreur, polluant le repo.\\
+\textbf{Solution} : ajout d'un \texttt{.gitignore} qui exclut les dossiers \texttt{\_\_pycache\_\_/} et suppression des fichiers déjà trackés.
+\end{problemebox}
+
+\begin{problemebox}[title=\textbf{Problème 4 : Deploy hook échoue sur IkramB23}]
+Le CI était copié depuis le fork de Nada mais le secret \texttt{RENDER\_DEPLOY\_HOOK} n'existait pas sur le repo d'Ikram $\rightarrow$ le job deploy échouait.\\
+\textbf{Solution} : Nada a transmis l'URL du deploy hook, Ikram l'a ajoutée dans les Secrets GitHub du repo.
+\end{problemebox}
+
+\begin{problemebox}[title=\textbf{Problème 5 : Render pointe sur le fork, pas sur IkramB23}]
+GitHub ne permet pas à l'app Render de Nada d'accéder au repo d'Ikram (limitation de GitHub Apps).\\
+\textbf{Solution} : on garde Render sur \texttt{webNada/TER\_S2\_D}. Le deploy hook est appelé depuis le CI de \texttt{IkramB23} $\rightarrow$ Render déploie depuis le fork synchronisé. Le code est identique.
+\end{problemebox}
+
+%% ====================================================================
+\section{Résumé -- Aide-mémoire}
+%% ====================================================================
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Concept} & \textbf{Explication en 1 ligne} \\
+\midrule
+DFS & Algorithme qui creuse en profondeur puis revient en arrière \\
+Prim & Algorithme qui choisit un mur au hasard dans une liste \\
+Boucles & On supprime des murs pour créer des chemins alternatifs \\
+API & Interface pour que des programmes demandent un labyrinthe \\
+Pygame & Bibliothèque Python pour créer un serveur web \\
+JSON & Format universel de données (comme un dictionnaire) \\
+Render & Hébergeur cloud qui fait tourner notre API 24h/24 \\
+Pygame & Serveur Python robuste pour la production \\
+pytest & Outil qui lance les tests automatiquement \\
+CI/CD & Tests auto + déploiement auto à chaque push \\
+GitHub Actions & Service GitHub qui exécute des scripts sur push \\
+Deploy Hook & URL secrète qui déclenche un redéploiement Render \\
+\texttt{.gitignore} & Fichier qui dit à Git d'ignorer certains fichiers \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%% ====================================================================
+\section{Grille d'évaluation -- Points clés à retenir}
+%% ====================================================================
+
+\subsection{Sur la partie Algo}
+\begin{itemize}
+    \item \textbf{Explications} : DFS creuse en profondeur (couloirs longs), Prim choisit au hasard dans une liste (structure étalée). Les deux génèrent des labyrinthes parfaits. On ajoute des boucles avec \texttt{add\_loops}.
+    \item \textbf{Illustrations} : \texttt{Gallery/best\_ascii.png} (meilleur des 100 candidats à 40\% boucles)
+    \item \textbf{Performances vs Pac-Man} : Prim est mieux car plus d'intersections, moins de culs-de-sac. Prouvé par le benchmark (\texttt{maze\_analyzer.py}).
+\end{itemize}
+
+%% ====================================================================
+\newpage
+\section{Annexe -- Code expliqué fichier par fichier}
+%% ====================================================================
+
+% -------------------------------------------------------
+\subsection{\texttt{Proto/maze\_dfs.py} -- Générateur DFS (Ikram)}
+
+\textbf{Fonction principale : \texttt{generate\_maze}} --- crée un labyrinthe parfait avec DFS.
+
+\begin{lstlisting}[language=Python, caption={Coeur du DFS : creuser en profondeur}]
+def generate_maze(width, height):
+    maze = [[0 for _ in range(width)] for _ in range(height)]
+    directions = [(0, 2), (2, 0), (0, -2), (-2, 0)]
+
+    def dfs(y, x):
+        maze[y][x] = 1                    # marquer comme couloir
+        random.shuffle(directions)         # melanger les directions
+        for dy, dx in directions:
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < height and 0 <= nx < width and maze[ny][nx] == 0:
+                maze[y + dy//2][x + dx//2] = 1   # ouvrir le mur entre
+                dfs(ny, nx)                       # continuer en profondeur
+
+    dfs(1, 1)    # on demarre toujours en (1,1)
+    return maze
+\end{lstlisting}
+
+\textbf{Explication ligne par ligne} :
+\begin{itemize}
+    \item \textbf{Ligne 2} : on crée une grille remplie de 0 (tout est mur au départ)
+    \item \textbf{Ligne 3} : les 4 directions possibles, avec un pas de 2 (car entre deux couloirs il y a toujours un mur)
+    \item \textbf{Ligne 6} : on met la case courante à 1 = couloir
+    \item \textbf{Ligne 7} : on mélange les directions pour avoir un labyrinthe aléatoire
+    \item \textbf{Ligne 10} : on vérifie que le voisin est dans les limites et est encore un mur
+    \item \textbf{Ligne 11} : \texttt{dy//2} permet de trouver le mur entre la case courante et le voisin → on l'ouvre
+    \item \textbf{Ligne 12} : appel récursif = on continue en profondeur (c'est le ``depth-first'')
+    \item Quand toutes les directions sont bloquées, la récursion revient en arrière automatiquement (\textit{backtracking})
+\end{itemize}
+
+% -------------------------------------------------------
+\subsection{\texttt{Proto/maze\_Prim.py} -- Générateur Prim original (Nada)}
+
+\textbf{Version orientée objet avec une classe \texttt{Maze}.}
+
+\begin{lstlisting}[language=Python, caption={Algorithme de Prim -- version classe (Nada)}]
+class Maze:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self.maze = [[1 for _ in range(width)] for _ in range(height)]
+        #           ^^^ convention Nada : 1 = mur
+
+    def generate_prim(self):
+        start_x = random.randrange(1, self.width, 2)   # position impaire
+        start_y = random.randrange(1, self.height, 2)
+        self.maze[start_y][start_x] = 0   # ouvrir la case de depart
+
+        walls = []
+        walls.extend(self.get_walls(start_x, start_y))
+
+        while walls:
+            wx, wy, px, py = random.choice(walls)  # choisir un mur au hasard
+            walls.remove((wx, wy, px, py))
+
+            if self.maze[wy][wx] == 1:       # si la cellule voisine est un mur
+                self.maze[wy][wx] = 0        # ouvrir la cellule
+                self.maze[py][px] = 0        # ouvrir le passage entre
+                walls.extend(self.get_walls(wx, wy))  # ajouter les nvx murs
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \textbf{Ligne 5} : grille remplie de 1 = tout est mur. \textcolor{red}{\textbf{Attention}} : ici 1=mur, 0=couloir (convention inversée par rapport au reste du projet)
+    \item \textbf{Ligne 9--10} : on démarre à une position impaire aléatoire (pas toujours (1,1) comme DFS)
+    \item \textbf{Ligne 17} : \textbf{différence clé avec DFS} : on pioche AU HASARD dans TOUTE la liste des murs (pas juste les voisins du point courant). C'est ce qui donne la structure étalée de Prim
+    \item \textbf{Ligne 21--23} : si le voisin est encore fermé, on l'ouvre et on ajoute ses murs à la liste
+\end{itemize}
+
+% -------------------------------------------------------
+\subsection{\texttt{Proto/maze\_Prim\_loops.py} -- Version finale (Ikram)}
+
+\textbf{C'est le fichier utilisé par l'API.} Adapté du code de Nada, avec la bonne convention et les boucles.
+
+\begin{lstlisting}[language=Python, caption={Prim adapté avec convention 0=mur, 1=couloir}]
+def generate_maze(width, height):
+    maze = [[0 for _ in range(width)] for _ in range(height)]
+    #        ^^^ convention corrigee : 0 = mur
+
+    start_x = random.randrange(1, width, 2)
+    start_y = random.randrange(1, height, 2)
+    maze[start_y][start_x] = 1   # ouvrir = mettre a 1 (couloir)
+
+    walls = []
+    # ... meme logique que Nada mais avec 0=mur, 1=couloir
+\end{lstlisting}
+
+\textbf{Fonction clé : \texttt{add\_loops}} --- transforme le labyrinthe parfait en labyrinthe avec boucles.
+
+\begin{lstlisting}[language=Python, caption={Ajout de boucles : suppression de murs entre couloirs}]
+def add_loops(maze, loop_percent=20):
+    height, width = len(maze), len(maze[0])
+    walls = []
+
+    for y in range(1, height-1):          # parcourir l'interieur
+        for x in range(1, width-1):
+            if maze[y][x] == 0:           # si c'est un mur
+                # verifier si ce mur est ENTRE deux couloirs
+                if (maze[y-1][x] == 1 and maze[y+1][x] == 1) or \
+                   (maze[y][x-1] == 1 and maze[y][x+1] == 1):
+                    walls.append((y, x))  # candidat a la suppression
+
+    n_remove = int(len(walls) * loop_percent / 100)  # combien supprimer
+    for y, x in random.sample(walls, min(n_remove, len(walls))):
+        maze[y][x] = 1    # transformer le mur en couloir = creer une boucle
+
+    return maze
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \textbf{Lignes 5--11} : on cherche tous les murs qui séparent deux couloirs (horizontal ou vertical). Ce sont les seuls qu'on peut supprimer sans casser la structure
+    \item \textbf{Ligne 9--10} : la condition vérifie si le mur a un couloir au-dessus ET en dessous, OU à gauche ET à droite
+    \item \textbf{Ligne 13} : on calcule combien de murs supprimer selon le pourcentage demandé
+    \item \textbf{Ligne 14} : \texttt{random.sample} choisit les murs à supprimer sans remplacement (pas de doublon)
+    \item \textbf{Ligne 15} : on met le mur à 1 = il devient un couloir → ça crée un chemin alternatif = une boucle
+\end{itemize}
+
+\textbf{Fonction d'entrée : \texttt{generate\_pacman\_maze}} --- celle appelée par l'API.
+
+\begin{lstlisting}[language=Python, caption={Point d'entree : force dimensions impaires + ajoute boucles}]
+def generate_pacman_maze(width=15, height=15, loop_percent=25):
+    if width % 2 == 0: width += 1    # forcer impair
+    if height % 2 == 0: height += 1
+
+    maze = generate_maze(width, height)       # 1) generer le labyrinthe parfait
+    maze = add_loops(maze, loop_percent)      # 2) ajouter des boucles
+    return maze
+\end{lstlisting}
+
+% -------------------------------------------------------
+\subsection{\texttt{local_pacman.py} -- API Flask (Nada + Ikram)}
+
+\begin{lstlisting}[language=Python, caption={Le serveur web complet}]
+from flask import Flask, jsonify, request
+from Proto.maze_Prim_loops import generate_pacman_maze
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Maze Generator API is running (loops version)"
+
+@app.route("/maze")
+def generate_maze_route():
+    width = int(request.args.get("width", 21))        # param ou 21 par defaut
+    height = int(request.args.get("height", 21))
+    loop_percent = int(request.args.get("loop_percent", 25))  # param ou 25%
+    maze = generate_pacman_maze(width, height, loop_percent)
+
+    return jsonify({           # convertir en JSON et renvoyer
+        "width": len(maze[0]),
+        "height": len(maze),
+        "loop_percent": loop_percent,
+        "maze": maze
+    })
+
+if __name__ == "__main__":
+    app.run(debug=True)        # mode dev (en prod c'est gunicorn qui lance)
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \textbf{Ligne 1} : on importe Pygame et ses outils
+    \item \textbf{Ligne 2} : on importe notre générateur depuis \texttt{Proto/maze\_Prim\_loops.py}
+    \item \textbf{Ligne 6--8} : \texttt{@app.route("/")} = quand quelqu'un va sur la racine du site, on affiche un message
+    \item \textbf{Ligne 10--22} : \texttt{@app.route("/maze")} = la route principale. \texttt{request.args.get} récupère les paramètres de l'URL (ex: \texttt{?width=15}). Si pas de paramètre, on utilise la valeur par défaut
+    \item \textbf{Ligne 17} : \texttt{jsonify} transforme le dictionnaire Python en réponse JSON que le navigateur peut lire
+    \item \textbf{Ligne 25} : en local, Flask tourne avec \texttt{app.run()}. Sur Render, c'est Pygame qui lance l'app (commande : \texttt{gunicorn app:app})
+\end{itemize}
+
+% -------------------------------------------------------
+\subsection{\texttt{Proto/maze\_analyzer.py} -- Benchmark (Ikram)}
+
+\textbf{Métriques d'analyse} --- chaque fonction mesure un aspect du labyrinthe.
+
+\begin{lstlisting}[language=Python, caption={Compter les culs-de-sac}]
+def count_dead_ends(maze):
+    height, width = len(maze), len(maze[0])
+    dead_ends = 0
+    for y in range(1, height-1):
+        for x in range(1, width-1):
+            if maze[y][x] == 1:                     # c'est un couloir
+                voisins = sum([
+                    maze[y-1][x] == 1,              # voisin du haut
+                    maze[y+1][x] == 1,              # voisin du bas
+                    maze[y][x-1] == 1,              # voisin de gauche
+                    maze[y][x+1] == 1               # voisin de droite
+                ])
+                if voisins == 1:                    # 1 seul voisin = impasse !
+                    dead_ends += 1
+    return dead_ends
+\end{lstlisting}
+
+\textbf{Explication} : un cul-de-sac est un couloir qui n'a qu'un seul voisin couloir (une seule sortie → impasse). On parcourt toute la grille et on compte.
+
+\begin{lstlisting}[language=Python, caption={Vérifier la connexité par BFS (plus long chemin)}]
+def longest_path(maze):
+    height, width = len(maze), len(maze[0])
+    start = (1, 1)
+    visited = set()
+    queue = deque([(start, 0)])         # file : (position, distance)
+    visited.add(start)
+    max_dist = 0
+
+    while queue:
+        (y, x), dist = queue.popleft()  # retirer le premier (FIFO)
+        max_dist = max(max_dist, dist)
+        for dy, dx in [(-1,0),(1,0),(0,-1),(0,1)]:
+            ny, nx = y+dy, x+dx
+            if 0 <= ny < height and 0 <= nx < width \
+               and maze[ny][nx] == 1 and (ny,nx) not in visited:
+                visited.add((ny, nx))
+                queue.append(((ny, nx), dist+1))
+
+    return max_dist
+\end{lstlisting}
+
+\textbf{Explication} : BFS (Breadth-First Search = parcours en largeur) explore le labyrinthe couche par couche. On part de (1,1), on visite tous les voisins directs, puis les voisins des voisins, etc. La distance maximale atteinte = le plus long chemin.
+
+\begin{lstlisting}[language=Python, caption={Compter les boucles (formule mathématique)}]
+def count_loops(maze):
+    # Dans un arbre : edges = nodes - 1
+    # Boucles = edges_reelles - (nodes - 1)
+    corridors = 0
+    edges = 0
+
+    for y in range(1, height-1):
+        for x in range(1, width-1):
+            if maze[y][x] == 1:
+                corridors += 1
+                if x+1 < width and maze[y][x+1] == 1:  # voisin a droite
+                    edges += 1
+                if y+1 < height and maze[y+1][x] == 1:  # voisin en bas
+                    edges += 1
+
+    loops = edges - (corridors - 1)
+    return max(0, loops)
+\end{lstlisting}
+
+\textbf{Explication} : dans un arbre (labyrinthe parfait), le nombre d'arêtes = nombre de nœuds -- 1. Si on a plus d'arêtes que ça, chaque arête en excès correspond à une boucle.
+
+% -------------------------------------------------------
+\subsection{\texttt{.github/workflows/ci.yml} -- Pipeline CI/CD (Ikram)}
+
+\begin{lstlisting}[language=yaml, caption={Le workflow GitHub Actions complet}]
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]           # declenche sur push vers main
+  pull_request:
+    branches: [ main ]           # et sur pull request vers main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest       # machine virtuelle Linux gratuite
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3          # recuperer le code du repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v4      # installer Python
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt  # flask, gunicorn
+          pip install pytest               # outil de tests
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v                 # lancer les 15 tests
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test                  # ATTEND que le job test soit vert
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # ^^^ seulement sur push vers main (pas sur pull request)
+
+    steps:
+      - name: Deploy to Render
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+          # ^^^ appelle l'URL secrete stockee dans les Secrets GitHub
+          echo "Deploiement declenche sur Render"
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \textbf{on: push/pull\_request} : le workflow se déclenche automatiquement à chaque push ou pull request sur \texttt{main}
+    \item \textbf{runs-on: ubuntu-latest} : GitHub fournit une machine virtuelle Linux gratuite pour exécuter les commandes
+    \item \textbf{steps} : les étapes sont exécutées dans l'ordre (checkout → Python → dépendances → tests)
+    \item \textbf{needs: test} : le job deploy ne démarre QUE si le job test a réussi. C'est la clé du CI/CD : \textbf{pas de déploiement si les tests échouent}
+    \item \textbf{\$\{\{ secrets.RENDER\_DEPLOY\_HOOK \}\}} : GitHub remplace cette variable par la vraie URL stockée dans les Secrets (jamais visible dans le code)
+\end{itemize}
+
+% -------------------------------------------------------
+\subsection{\texttt{tests/test\_maze\_generator.py} -- Tests du générateur (Ikram)}
+
+\textbf{Exemples de tests importants} :
+
+\begin{lstlisting}[language=Python, caption={Test de connexité : BFS pour vérifier que tout est accessible}]
+def test_maze_connectivity():
+    """Le maze doit etre connexe (tous les couloirs accessibles)."""
+    maze = generate_pacman_maze(21, 21, loop_percent=25)
+    h, w = len(maze), len(maze[0])
+
+    # trouver un premier couloir
+    start = None
+    for y in range(h):
+        for x in range(w):
+            if maze[y][x] == 1:
+                start = (y, x)
+                break
+        if start: break
+
+    # BFS : explorer tout ce qui est accessible depuis start
+    visited = set()
+    queue = [start]
+    visited.add(start)
+    while queue:
+        cy, cx = queue.pop(0)
+        for dy, dx in [(-1,0), (1,0), (0,-1), (0,1)]:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w \
+               and (ny, nx) not in visited and maze[ny][nx] == 1:
+                visited.add((ny, nx))
+                queue.append((ny, nx))
+
+    total_corridors = sum(cell == 1 for row in maze for cell in row)
+    assert len(visited) == total_corridors
+    # ^^^ si on a visite TOUS les couloirs = le maze est connexe
+\end{lstlisting}
+
+\textbf{Explication} : ce test vérifie qu'on peut atteindre TOUS les couloirs du labyrinthe depuis n'importe quel point. On fait un BFS (parcours en largeur) et on compte combien de cases on atteint. Si le nombre de cases visitées = le nombre total de couloirs → le labyrinthe est connexe (pas de zones isolées).
+
+\begin{lstlisting}[language=Python, caption={Test que add\_loops crée bien des couloirs supplémentaires}]
+def test_add_loops_increases_corridors():
+    """add_loops doit creer plus de couloirs que le maze parfait."""
+    maze = generate_maze(21, 21)
+    corridors_before = sum(cell == 1 for row in maze for cell in row)
+    maze = add_loops(maze, loop_percent=30)
+    corridors_after = sum(cell == 1 for row in maze for cell in row)
+    assert corridors_after > corridors_before
+    # ^^^ apres add_loops, il doit y avoir PLUS de couloirs qu'avant
+\end{lstlisting}
+
+% -------------------------------------------------------
+\subsection{\texttt{tests/test\_app\_local.py} -- Tests de l'API (Ikram)}
+
+\begin{lstlisting}[language=Python, caption={Test de l'API avec le client de test Flask}]
+from app import app
+
+def get_client():
+    app.config['TESTING'] = True       # mode test
+    return app.test_client()           # simule un navigateur
+
+def test_maze_route_default():
+    """GET /maze sans params doit retourner un maze 21x21."""
+    client = get_client()
+    response = client.get('/maze')     # simuler GET /maze
+    assert response.status_code == 200 # reponse OK
+    data = response.get_json()         # parser le JSON
+    assert data["width"] == 21         # verifier les dimensions
+    assert data["height"] == 21
+    assert len(data["maze"]) == 21     # verifier la grille
+    assert len(data["maze"][0]) == 21
+
+def test_maze_contains_0_and_1():
+    """Le maze doit contenir que des 0 et 1."""
+    client = get_client()
+    response = client.get('/maze?width=15&height=15')
+    data = response.get_json()
+    for row in data["maze"]:
+        for cell in row:
+            assert cell in (0, 1)      # rien d'autre que 0 et 1
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \texttt{app.test\_client()} crée un ``faux navigateur'' qui envoie des requêtes à notre API sans avoir besoin de lancer le serveur
+    \item \texttt{client.get('/maze')} simule un \texttt{GET /maze} comme si quelqu'un tapait l'URL dans un navigateur
+    \item \texttt{response.get\_json()} récupère la réponse JSON et la convertit en dictionnaire Python
+    \item On vérifie ensuite que les dimensions, le contenu et le format sont corrects
+\end{itemize}
+
+% -------------------------------------------------------
+\subsection{\texttt{test\_api\_cloud.py} -- Tests sur Render (Nada)}
+
+\begin{lstlisting}[language=Python, caption={Test de l'API deployee sur Render}]
+import requests
+
+URL = "https://ter-s2-d.onrender.com/maze"
+
+def test_labyrinth_dimensions():
+    response = requests.get(URL, params={"width": 15, "height": 15})
+    assert response.status_code == 200       # le serveur repond
+
+    data = response.json()
+    assert len(data["maze"]) == 15           # bonne hauteur
+    assert len(data["maze"][0]) == 15        # bonne largeur
+
+def test_labyrinth_has_corridors():
+    response = requests.get(URL, params={"width": 15, "height": 15})
+    data = response.json()
+    nb_couloirs = sum(cell == 1 for row in data["maze"] for cell in row)
+    assert nb_couloirs > 0                   # il y a bien des couloirs
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \textbf{Différence avec les tests locaux} : ici on utilise \texttt{requests.get} qui fait une VRAIE requête HTTP vers le serveur Render sur internet (pas un faux client)
+    \item C'est un test \textbf{end-to-end} (bout en bout) : on teste toute la chaîne (internet → Render → Pygame → Flask → générateur → réponse JSON)
+    \item Ces tests ne sont pas dans le CI car Render peut être en veille (le premier appel prend 30s et peut échouer par timeout)
+\end{itemize}
+
+% -------------------------------------------------------
+\subsection{\texttt{test\_Lab\_properties.py} -- Tests de propriétés (Nada)}
+
+\begin{lstlisting}[language=Python, caption={Test de propriete : le labyrinthe a des couloirs}]
+import requests
+
+URL = "https://ter-s2-d.onrender.com/maze"
+
+def test_labyrinth_has_corridors():
+    response = requests.get(URL, params={"width": 15, "height": 15})
+    assert response.status_code == 200
+
+    data = response.json()
+    maze = data["maze"]
+    nb_couloirs = sum(1 for row in maze for cell in row if cell == 1)
+    assert nb_couloirs > 0, "Le Labyrinthe ne contient aucun couloir"
+\end{lstlisting}
+
+\textbf{Explication} : teste une \textbf{propriété} fondamentale --- un labyrinthe doit forcément contenir des couloirs. Si ce test échoue, ça veut dire que le générateur est complètement cassé.
+
+% -------------------------------------------------------
+\subsection{\texttt{Proto/Benchmark\_prim.py} -- Benchmark Prim seul (Nada)}
+
+\begin{lstlisting}[language=Python, caption={Analyse d'un labyrinthe Prim (convention Nada : 0=couloir)}]
+def count_dead_ends(maze):
+    height, width = len(maze), len(maze[0])
+    dead_ends = 0
+    for y in range(1, height-1):
+        for x in range(1, width-1):
+            if maze[y][x] == 0:           # 0 = couloir (convention Nada)
+                voisins = sum([
+                    maze[y-1][x] == 0,
+                    maze[y+1][x] == 0,
+                    maze[y][x-1] == 0,
+                    maze[y][x+1] == 0
+                ])
+                if voisins == 1:
+                    dead_ends += 1
+    return dead_ends
+\end{lstlisting}
+
+\textbf{Explication} : même logique que \texttt{maze\_analyzer.py} d'Ikram, mais avec la convention de Nada (0=couloir au lieu de 1=couloir). Ce fichier analyse uniquement les labyrinthes Prim. Il utilise la classe \texttt{Maze} de Nada directement.
+
+% -------------------------------------------------------
+\subsection{\texttt{requirements.txt} -- Dépendances (Nada)}
+
+\begin{lstlisting}[caption={Les 3 paquets Python nécessaires}]
+flask
+gunicorn
+pytest
+\end{lstlisting}
+
+\textbf{Explication} :
+\begin{itemize}
+    \item \textbf{flask} : le framework web qui fait tourner notre API
+    \item \textbf{gunicorn} : le serveur de production (utilisé par Render pour lancer Flask)
+    \item \textbf{pytest} : l'outil de tests automatiques
+\end{itemize}
+
+Ce fichier est lu par \texttt{pip install -r requirements.txt} (dans le CI et sur Render) pour installer automatiquement ces 3 paquets.
+
+% -------------------------------------------------------
+\subsection{\texttt{.gitignore} -- Exclusions Git (Ikram)}
+
+\begin{lstlisting}[caption={Fichiers ignorés par Git}]
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.env
+*.log
+\end{lstlisting}
+
+\textbf{Explication} : ce fichier dit à Git de ne JAMAIS tracker ces fichiers/dossiers :
+\begin{itemize}
+    \item \texttt{\_\_pycache\_\_/} et \texttt{*.pyc} : fichiers compilés Python (générés automatiquement, inutiles sur GitHub)
+    \item \texttt{.pytest\_cache/} : cache de pytest
+    \item \texttt{.env} : fichier d'environnement (pourrait contenir des secrets)
+\end{itemize}
+
+\subsection{Sur la partie Graphique}
+\begin{itemize}
+    \item \textbf{Présence de best.png} : oui, dans \texttt{Gallery/best\_ascii.png}
+    \item \textbf{Avis subjectif} : labyrinthe visuellement équilibré, pas trop saturé ni trop vide, sélectionné parmi 100 candidats en minimisant les îlots de murs isolés
+\end{itemize}
+
+\subsection{Sur la partie Implémentation}
+\begin{itemize}
+    \item \textbf{Explications} : API Flask avec 2 routes (\texttt{/} et \texttt{/maze}), paramètres \texttt{width}, \texttt{height}, \texttt{loop\_percent}, retour JSON
+    \item \textbf{Choix} : Python (simple), Flask (léger), fonctions plutôt que classes (plus testable), Prim plutôt que DFS (mieux pour Pac-Man), Render gratuit pour le cloud
+\end{itemize}
+
+\subsection{Sur la partie Projet}
+\begin{itemize}
+    \item \textbf{Utilisation GitHub} : repo partagé, branches individuelles, merge sur main, CI/CD avec GitHub Actions, secrets pour le deploy hook
+    \item \textbf{Collaboration} : Ikram (algo + tests + CI/CD), Nada (API + Render + tests cloud), Aya (GUI à venir). Synchronisation entre le repo principal et le fork via git remotes
+\end{itemize}
+
+\end{document}
