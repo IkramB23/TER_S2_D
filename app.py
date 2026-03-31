@@ -5,7 +5,7 @@ from pymongo import MongoClient
 from Proto.maze_Prim_loops import generate_pacman_maze
 
 app = Flask(__name__)
-
+#test
 # --- CONFIGURATION MONGODB ATLAS ---
 MONGO_URI = os.getenv("MONGO_URI", "")
 if MONGO_URI:
