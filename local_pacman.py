@@ -7,10 +7,16 @@ import pygame
 import requests
 
 from Proto.maze_Prim_loops import generate_pacman_maze
+from game.environment import Environment
+from game.agents import HumanAgent, BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost
+from game.engine import GameEngine
+from game.recorder import GameRecorder
+from game.renderer import PacmanRenderer
 
 
 DB_PATH = Path(__file__).parent / "mazes.db"
 API_URL = "https://ter-s2-d.onrender.com"
+RECORDINGS_DIR = Path(__file__).parent / "recordings"
 
 
 class MazeRepository:
@@ -84,7 +90,7 @@ class MazeRepository:
 class LocalPacmanGame:
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("Pac-Man Local - TER S2")
+        pygame.display.set_caption("Pac-Man - TER S2")
 
         self.repo = MazeRepository(DB_PATH)
         self.repo.ensure_one_default()
@@ -93,22 +99,56 @@ class LocalPacmanGame:
         self.current = self.repo.get_maze(self.maze_ids[self.current_index])
 
         self.window_w = 960
-        self.window_h = 760
+        self.window_h = 800
         self.screen = pygame.display.set_mode((self.window_w, self.window_h))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Segoe UI", 24)
-        self.small = pygame.font.SysFont("Segoe UI", 18)
 
         self.target_size = 21
         self.target_loop = self.current["loop_percent"]
 
-        self.cell_size = 24
-        self.offset_x = 70
-        self.offset_y = 90
+        self.renderer = PacmanRenderer(self.screen, self.window_w, self.window_h)
 
-        self.player = self._find_start(self.current["maze"])
-        self.player_dir = (1, 0)
-        self.ticks = 0
+        self._start_game()
+
+    # ------------------------------------------------------------------
+    #  lancement du jeu
+    # ------------------------------------------------------------------
+
+    def _start_game(self):
+        # initialise le moteur de jeu avec le labyrinthe courant
+        maze = self.current["maze"]
+        self.env = Environment(maze)
+
+        # pacman apparaît en bas
+        pac_pos = self.env.find_pacman_spawn()
+        self.pacman = HumanAgent(*pac_pos)
+
+        # les fantômes apparaissent au centre
+        ghost_spawns = self.env.find_ghost_spawns(4)
+        w, h = self.env.width, self.env.height
+        ghost_classes = [BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost]
+        self.ghosts = []
+        for i, cls in enumerate(ghost_classes):
+            if i < len(ghost_spawns):
+                gx, gy = ghost_spawns[i]
+            else:
+                gx, gy = ghost_spawns[0]
+            self.ghosts.append(cls(gx, gy, w, h))
+
+        # enregistreur
+        self.recorder = GameRecorder()
+        self.recorder.set_metadata(
+            maze, w, h,
+            cloud_id=self.current.get("cloud_id"),
+            agent_type="human",
+        )
+
+        # moteur de jeu
+        self.engine = GameEngine(self.env, self.pacman, self.ghosts, self.recorder)
+
+    # ------------------------------------------------------------------
+    #  gestion des labyrinthes (api + stockage local)
+    # ------------------------------------------------------------------
 
     def _update_target_size(self, delta: int):
         self.target_size = max(11, min(41, self.target_size + delta))
@@ -118,13 +158,6 @@ class LocalPacmanGame:
         self.target_loop = value
         self._create_new_maze()
 
-    def _find_start(self, maze):
-        for y in range(1, len(maze) - 1):
-            for x in range(1, len(maze[0]) - 1):
-                if maze[y][x] == 1:
-                    return [x, y]
-        return [1, 1]
-
     def _load_index(self, index: int):
         self.maze_ids = self.repo.list_ids()
         if not self.maze_ids:
@@ -133,8 +166,7 @@ class LocalPacmanGame:
         self.current = self.repo.get_maze(self.maze_ids[self.current_index])
         self.target_size = self.current["width"]
         self.target_loop = self.current["loop_percent"]
-        self.player = self._find_start(self.current["maze"])
-        self.player_dir = (1, 0)
+        self._start_game()
 
     def _create_new_maze(self):
         try:
@@ -148,7 +180,7 @@ class LocalPacmanGame:
             height = len(maze)
             new_id = self.repo.save_maze(maze, width, height, self.target_loop, cloud_id)
         except Exception as e:
-            print(f"Erreur API: {e}. Génération locale hors-ligne...")
+            print(f"API error: {e}. Generating locally...")
             maze = generate_pacman_maze(self.target_size, self.target_size, self.target_loop)
             width = len(maze[0])
             height = len(maze)
@@ -157,189 +189,116 @@ class LocalPacmanGame:
         self.maze_ids = self.repo.list_ids()
         self.current_index = self.maze_ids.index(new_id)
         self.current = self.repo.get_maze(new_id)
-        self.player = self._find_start(self.current["maze"])
-        self.player_dir = (1, 0)
+        self._start_game()
 
     def _rate_current_maze(self, rating):
         cloud_id = self.current.get("cloud_id")
         if not cloud_id:
-            print("Impossible de noter: Ce labyrinthe ne provient pas du cloud.")
+            print("Cannot rate: this maze has no cloud ID.")
             return
         try:
             url = f"{API_URL}/maze/{cloud_id}/rate"
             response = requests.post(url, json={"rating": rating}, timeout=3)
             if response.status_code == 200:
-                print(f"Labyrinthe {cloud_id} noté: {rating}/5 !")
+                print(f"Maze {cloud_id} rated: {rating}/5 !")
             else:
-                print(f"Erreur de notation: {response.json()}")
+                print(f"Rating error: {response.json()}")
         except Exception as e:
-            print(f"Erreur d'envoi de la note: {e}")
+            print(f"Rating send error: {e}")
 
-    def _move_player(self, dx: int, dy: int):
-        nx = self.player[0] + dx
-        ny = self.player[1] + dy
-        maze = self.current["maze"]
-        if 0 <= ny < len(maze) and 0 <= nx < len(maze[0]) and maze[ny][nx] == 1:
-            self.player[0] = nx
-            self.player[1] = ny
-            self.player_dir = (dx, dy)
+    def _save_recording(self):
+        # sauvegarde l'enregistrement de la partie
+        RECORDINGS_DIR.mkdir(exist_ok=True)
+        filename = f"game_{int(time.time())}.json"
+        filepath = RECORDINGS_DIR / filename
+        self.recorder.save(filepath)
+        print(f"Game saved to {filepath}")
 
-    def _draw_maze(self):
-        maze = self.current["maze"]
-        h = len(maze)
-        w = len(maze[0])
-
-        max_cell_w = (self.window_w - 140) // w
-        max_cell_h = (self.window_h - 190) // h
-        self.cell_size = max(10, min(max_cell_w, max_cell_h))
-
-        maze_px_w = w * self.cell_size
-        maze_px_h = h * self.cell_size
-        self.offset_x = (self.window_w - maze_px_w) // 2
-        self.offset_y = 110
-
-        wall_color = (24, 85, 255)
-        dot_color = (245, 245, 245)
-
-        pygame.draw.rect(
-            self.screen,
-            (8, 8, 20),
-            (self.offset_x - 6, self.offset_y - 6, maze_px_w + 12, maze_px_h + 12),
-            border_radius=12,
-        )
-
-        for y in range(h):
-            for x in range(w):
-                px = self.offset_x + x * self.cell_size
-                py = self.offset_y + y * self.cell_size
-                cell = maze[y][x]
-                if cell == 0:
-                    pygame.draw.rect(
-                        self.screen,
-                        wall_color,
-                        (px, py, self.cell_size, self.cell_size),
-                        border_radius=max(2, self.cell_size // 5),
-                    )
-                else:
-                    cx = px + self.cell_size // 2
-                    cy = py + self.cell_size // 2
-                    r = max(1, self.cell_size // 10)
-                    pygame.draw.circle(self.screen, dot_color, (cx, cy), r)
-
-    def _draw_pacman(self):
-        x, y = self.player
-        px = self.offset_x + x * self.cell_size + self.cell_size // 2
-        py = self.offset_y + y * self.cell_size + self.cell_size // 2
-        radius = max(5, self.cell_size // 2 - 2)
-
-        mouth = (self.ticks // 8) % 2
-        open_angle = 30 if mouth == 0 else 8
-
-        dir_angle = {
-            (1, 0): 0,
-            (-1, 0): 180,
-            (0, -1): 90,
-            (0, 1): 270,
-        }.get(tuple(self.player_dir), 0)
-
-        start = dir_angle + open_angle
-        end = dir_angle - open_angle
-
-        pygame.draw.circle(self.screen, (255, 220, 40), (px, py), radius)
-
-        p1 = (px, py)
-        p2 = (
-            int(px + radius * pygame.math.Vector2(1, 0).rotate(start).x),
-            int(py - radius * pygame.math.Vector2(1, 0).rotate(start).y),
-        )
-        p3 = (
-            int(px + radius * pygame.math.Vector2(1, 0).rotate(end).x),
-            int(py - radius * pygame.math.Vector2(1, 0).rotate(end).y),
-        )
-        pygame.draw.polygon(self.screen, (0, 0, 0), [p1, p2, p3])
-
-    def _draw_hud(self):
-        title = self.font.render("Pac-Man Local (sans fantômes)", True, (235, 235, 235))
-        self.screen.blit(title, (24, 20))
-
-        cid = self.current.get('cloud_id')
-        disp_id = cid if cid else self.current['id']
-        info = (
-            f"Maze ID: {disp_id}   "
-            f"Taille: {self.current['width']}x{self.current['height']}   "
-            f"Boucles: {self.current['loop_percent']}%"
-        )
-        line = self.small.render(info, True, (210, 210, 210))
-        self.screen.blit(line, (24, 55))
-
-        pending = self.small.render(
-            f"Paramètres courants: taille {self.target_size} | boucles {self.target_loop}%",
-            True,
-            (210, 210, 210),
-        )
-        self.screen.blit(pending, (24, 80))
-
-        controls = (
-            "Flèches/WASD: bouger | N: nouveau | P/M: précédent/suivant | +/-: taille | 0/2/4: boucles"
-        )
-        controls_surface = self.small.render(controls, True, (180, 180, 180))
-        self.screen.blit(controls_surface, (24, self.window_h - 34))
+    # ------------------------------------------------------------------
+    #  boucle principale
+    # ------------------------------------------------------------------
 
     def run(self):
         running = True
         while running:
-            self.ticks += 1
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
                 if event.type == pygame.KEYDOWN:
-                    char = event.unicode
-                    if event.key in (pygame.K_LEFT, pygame.K_a):
-                        self._move_player(-1, 0)
-                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                        self._move_player(1, 0)
-                    elif event.key in (pygame.K_UP, pygame.K_w):
-                        self._move_player(0, -1)
-                    elif event.key in (pygame.K_DOWN, pygame.K_s):
-                        self._move_player(0, 1)
-                    elif event.key == pygame.K_n:
-                        self._create_new_maze()
-                    elif event.key in (pygame.K_LEFTBRACKET, pygame.K_p, pygame.K_PAGEUP) or char == "[":
-                        self._load_index(self.current_index - 1)
-                    elif event.key in (pygame.K_RIGHTBRACKET, pygame.K_m, pygame.K_PAGEDOWN) or char == "]":
-                        self._load_index(self.current_index + 1)
-                    elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS) or char == "-":
-                        self._update_target_size(-2)
-                    elif event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS) or char == "+":
-                        self._update_target_size(2)
-                    elif event.key == pygame.K_KP0:
-                        self._set_target_loop(0)
-                    elif event.key == pygame.K_KP2:
-                        self._set_target_loop(25)
-                    elif event.key == pygame.K_KP4:
-                        self._set_target_loop(40)
-                    elif event.key == pygame.K_0:
-                        self._rate_current_maze(0)
-                    elif event.key == pygame.K_1:
-                        self._rate_current_maze(1)
-                    elif event.key == pygame.K_2:
-                        self._rate_current_maze(2)
-                    elif event.key == pygame.K_3:
-                        self._rate_current_maze(3)
-                    elif event.key == pygame.K_4:
-                        self._rate_current_maze(4)
-                    elif event.key == pygame.K_5:
-                        self._rate_current_maze(5)
+                    running = self._handle_key(event, running)
 
-            self.screen.fill((0, 0, 0))
-            self._draw_maze()
-            self._draw_pacman()
-            self._draw_hud()
-            pygame.display.flip()
+            # avancer la logique du jeu
+            self.engine.tick()
+
+            # rendu graphique
+            self.renderer.render(self.engine)
             self.clock.tick(60)
 
+        # sauvegarder l'enregistrement en quittant
+        if self.recorder.total_frames > 0:
+            self._save_recording()
+
         pygame.quit()
+
+    def _handle_key(self, event, running):
+        char = event.unicode
+
+        # déplacement (entrée de l'agent pacman)
+        if event.key in (pygame.K_LEFT, pygame.K_a):
+            self.pacman.set_direction(-1, 0)
+        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+            self.pacman.set_direction(1, 0)
+        elif event.key in (pygame.K_UP, pygame.K_w):
+            self.pacman.set_direction(0, -1)
+        elif event.key in (pygame.K_DOWN, pygame.K_s):
+            self.pacman.set_direction(0, 1)
+
+        # nouveau labyrinthe
+        elif event.key == pygame.K_n:
+            self._create_new_maze()
+
+        # relancer le labyrinthe courant
+        elif event.key == pygame.K_r:
+            self._start_game()
+
+        # parcourir les labyrinthes
+        elif event.key in (pygame.K_LEFTBRACKET, pygame.K_p, pygame.K_PAGEUP) or char == "[":
+            self._load_index(self.current_index - 1)
+        elif event.key in (pygame.K_RIGHTBRACKET, pygame.K_m, pygame.K_PAGEDOWN) or char == "]":
+            self._load_index(self.current_index + 1)
+
+        # taille du labyrinthe
+        elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS) or char == "-":
+            self._update_target_size(-2)
+        elif event.key in (pygame.K_EQUALS, pygame.K_PLUS, pygame.K_KP_PLUS) or char == "+":
+            self._update_target_size(2)
+
+        # pourcentage de boucles (pavé numérique)
+        elif event.key == pygame.K_KP0:
+            self._set_target_loop(0)
+        elif event.key == pygame.K_KP2:
+            self._set_target_loop(25)
+        elif event.key == pygame.K_KP4:
+            self._set_target_loop(40)
+
+        # noter le labyrinthe (F1-F5)
+        elif event.key == pygame.K_F1:
+            self._rate_current_maze(1)
+        elif event.key == pygame.K_F2:
+            self._rate_current_maze(2)
+        elif event.key == pygame.K_F3:
+            self._rate_current_maze(3)
+        elif event.key == pygame.K_F4:
+            self._rate_current_maze(4)
+        elif event.key == pygame.K_F5:
+            self._rate_current_maze(5)
+
+        # quitter
+        elif event.key == pygame.K_ESCAPE:
+            return False
+
+        return running
 
 
 def main():

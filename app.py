@@ -5,8 +5,8 @@ from pymongo import MongoClient
 from Proto.maze_Prim_loops import generate_pacman_maze
 
 app = Flask(__name__)
-#test
-# --- CONFIGURATION MONGODB ATLAS ---
+
+# --- configuration mongodb atlas ---
 MONGO_URI = os.getenv("MONGO_URI", "")
 if MONGO_URI:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
@@ -26,10 +26,10 @@ def generate_maze_route():
     loop_percent = int(request.args.get("loop_percent", 25))
     maze = generate_pacman_maze(width, height, loop_percent)
 
-    # 1. Création de l'ID Unique
+    # 1. création de l'id unique
     maze_id = str(uuid.uuid4())
 
-    # 2. Enregistrement dans MongoDB Atlas (non bloquant en cas d'erreur)
+    # 2. enregistrement dans mongodb atlas (non bloquant en cas d'erreur)
     if mazes_collection is not None:
         try:
             mazes_collection.insert_one({
