@@ -1,14 +1,17 @@
 import os
 import uuid
 from flask import Flask, jsonify, request
-from pymongo import MongoClient
+try:
+    from pymongo import MongoClient
+except ImportError:
+    MongoClient = None
 from Proto.maze_Prim_loops import generate_pacman_maze
 
 app = Flask(__name__)
 
 # --- configuration mongodb atlas ---
 MONGO_URI = os.getenv("MONGO_URI", "")
-if MONGO_URI:
+if MONGO_URI and MongoClient is not None:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
     db = client.pacman_db
     mazes_collection = db.mazes

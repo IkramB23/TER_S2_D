@@ -3,9 +3,10 @@
 from game.agents import GhostMode
 
 
-# séquence des modes fantômes : (mode, durée en ticks)
-# à 60 fps : 420 ticks = 7s, 1200 = 20s, 300 = 5s
+# suite des modes des fantômes : (mode, durée en ticks)
+# à 60 fps : 420 ticks = 7 s, 1200 = 20 s, 300 = 5 s, 600 = 10 s
 MODE_SEQUENCE = [
+    (GhostMode.CAGED, 600),   # les fantômes restent dans la cage 10 s
     (GhostMode.SCATTER, 420),
     (GhostMode.CHASE, 1200),
     (GhostMode.SCATTER, 420),
@@ -33,17 +34,17 @@ class GameEngine:
         self.game_won = False
         self.paused = False
 
-        # vitesse de déplacement (bouge tous les N ticks à 60fps)
-        self.pacman_speed = 6
+        # vitesse de déplacement (bouge tous les n ticks à 60 fps)
+        self.pacman_speed = 8
         self.ghost_speed = 8
         self.ghost_frightened_speed = 12
 
-        # cycle des modes fantômes
+        # suite des modes des fantômes
         self.ghost_mode_index = 0
         self.ghost_mode_timer = MODE_SEQUENCE[0][1]
         self.current_ghost_mode = MODE_SEQUENCE[0][0]
 
-        # combo quand on mange un fantôme
+        # points quand on mange un fantôme
         self.ghost_eat_combo = 200
 
         # apparition des fruits
@@ -58,10 +59,10 @@ class GameEngine:
 
         self.tick_count += 1
 
-        # --- cycle des modes fantômes ---
+        # --- suite des modes des fantômes ---
         self._update_ghost_mode_cycle()
 
-        # --- déplacer pacman ---
+        # --- déplacer pac-man ---
         if self.tick_count % self.pacman_speed == 0:
             action = self.pacman.get_action(self.env)
             if action != (0, 0):
@@ -93,7 +94,7 @@ class GameEngine:
         # --- vérifier les collisions ---
         self._check_ghost_collisions()
 
-        # --- gestion des fruits ---
+        # --- gérer les fruits ---
         self.env.update_fruit()
         eaten_ratio = self.pellets_eaten / max(1, self.env.total_pellets)
         if not self.fruit_spawned_1 and eaten_ratio >= 0.3:
@@ -107,15 +108,15 @@ class GameEngine:
         if self.env.all_pellets_eaten():
             self.game_won = True
 
-        # --- enregistrer la frame ---
+        # --- enregistrer l'image du jeu ---
         if self.recorder:
             self.recorder.record_frame(self.get_state())
 
     def _on_pacman_move(self):
-        # appelé quand pacman se déplace sur une nouvelle case
+        # appelé quand pac-man bouge sur une nouvelle case
         x, y = self.pacman.x, self.pacman.y
 
-        # manger pellet / power pellet
+        # manger une bille ou une grosse bille
         points, is_power = self.env.eat_pellet(x, y)
         if points > 0:
             self.score += points
@@ -125,12 +126,12 @@ class GameEngine:
                 for ghost in self.ghosts:
                     ghost.set_frightened()
 
-        # manger fruit
+        # manger un fruit
         fruit_pts = self.env.eat_fruit(x, y)
         self.score += fruit_pts
 
     def _check_ghost_collisions(self):
-        # vérifie si pacman touche un fantôme
+        # regarde si pac-man touche un fantôme
         for ghost in self.ghosts:
             if ghost.x == self.pacman.x and ghost.y == self.pacman.y:
                 if ghost.mode == GhostMode.FRIGHTENED:
@@ -143,7 +144,7 @@ class GameEngine:
                     return
 
     def _pacman_dies(self):
-        # pacman perd une vie
+        # pac-man perd une vie
         self.lives -= 1
         if self.lives <= 0:
             self.game_over = True
@@ -151,14 +152,14 @@ class GameEngine:
             self._reset_positions()
 
     def _reset_positions(self):
-        # remet tous les agents à leur position de départ
+        # remet tous les agents au départ
         self.pacman.reset()
         for ghost in self.ghosts:
             ghost.reset()
             ghost.mode = self.current_ghost_mode
 
     def _update_ghost_mode_cycle(self):
-        # avance le timer du cycle scatter/chase
+        # avance le temps du cycle scatter/chase
         if self.ghost_mode_timer > 0:
             self.ghost_mode_timer -= 1
             if self.ghost_mode_timer <= 0:
@@ -188,7 +189,7 @@ class GameEngine:
         self.fruit_spawned_2 = False
 
     def get_state(self):
-        # retourne un snapshot de l'état complet du jeu
+        # retourne un résumé de l'état du jeu
         return {
             "tick": self.tick_count,
             "score": self.score,
