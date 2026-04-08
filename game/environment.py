@@ -1,4 +1,4 @@
-# environment — plateau de jeu dynamique (maze + pellets + fruits)
+# environment - plateau de jeu dynamique (maze + pellets + fruits)
 
 
 class Environment:

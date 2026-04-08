@@ -1,8 +1,9 @@
-# agents — pac-man (humain / futur ia) et fantômes (chacun avec une ia différente)
+# agents - pac-man (humain / futur ia) et fantomes (chacun avec une ia differente)
 
 from abc import ABC, abstractmethod
 from collections import deque
 import heapq
+import math
 import random
 
 
@@ -80,6 +81,117 @@ def astar_direction(walls, width, height, start, target):
             heapq.heappush(heap, (nf, ng, nx, ny, direction))
 
     return (0, 0)
+
+
+def dfs_direction(walls, width, height, start, target):
+    # dfs : parcours en profondeur, donne le premier pas vers la cible
+    if start == target:
+        return (0, 0)
+
+    visited = {start}
+    stack = [(start, None)]
+
+    while stack:
+        (x, y), first_dir = stack.pop()
+        for dx, dy in DIRECTIONS:
+            nx, ny = x + dx, y + dy
+            if (0 <= nx < width and 0 <= ny < height
+                    and (nx, ny) not in visited and (nx, ny) not in walls):
+                direction = first_dir if first_dir else (dx, dy)
+                if (nx, ny) == target:
+                    return direction
+                visited.add((nx, ny))
+                stack.append(((nx, ny), direction))
+
+    return (0, 0)
+
+
+def ucs_direction(walls, width, height, start, target):
+    # ucs (uniform cost search) : cherche le chemin de coût minimal (dijkstra)
+    if start == target:
+        return (0, 0)
+
+    best_g = {start: 0}
+    heap = [(0, start[0], start[1], None)]
+
+    while heap:
+        g, x, y, first_dir = heapq.heappop(heap)
+        current = (x, y)
+        if current == target:
+            return first_dir if first_dir else (0, 0)
+        if g > best_g.get(current, float("inf")):
+            continue
+
+        for dx, dy in DIRECTIONS:
+            nx, ny = x + dx, y + dy
+            if not (0 <= nx < width and 0 <= ny < height):
+                continue
+            if (nx, ny) in walls:
+                continue
+
+            ng = g + 1
+            neighbor = (nx, ny)
+            if ng >= best_g.get(neighbor, float("inf")):
+                continue
+
+            best_g[neighbor] = ng
+            direction = first_dir if first_dir else (dx, dy)
+            heapq.heappush(heap, (ng, nx, ny, direction))
+
+    return (0, 0)
+
+
+def mcts_direction(walls, width, height, start, target, simulations=80):
+    # monte carlo tree search : simule des chemins aléatoires pour choisir le meilleur premier pas
+    if start == target:
+        return (0, 0)
+
+    first_moves = {}
+    for dx, dy in DIRECTIONS:
+        nx, ny = start[0] + dx, start[1] + dy
+        if (0 <= nx < width and 0 <= ny < height
+                and (nx, ny) not in walls):
+            first_moves[(dx, dy)] = {"visits": 0, "total_score": 0.0}
+
+    if not first_moves:
+        return (0, 0)
+
+    max_depth = width + height
+
+    for _ in range(simulations):
+        move = random.choice(list(first_moves.keys()))
+        x, y = start[0] + move[0], start[1] + move[1]
+        visited = {start, (x, y)}
+
+        for depth in range(1, max_depth):
+            if (x, y) == target:
+                break
+            neighbors = []
+            for ddx, ddy in DIRECTIONS:
+                nnx, nny = x + ddx, y + ddy
+                if (0 <= nnx < width and 0 <= nny < height
+                        and (nnx, nny) not in walls and (nnx, nny) not in visited):
+                    neighbors.append((nnx, nny))
+            if not neighbors:
+                break
+            x, y = random.choice(neighbors)
+            visited.add((x, y))
+
+        dist = _manhattan((x, y), target)
+        score = 1.0 / (1.0 + dist)
+        first_moves[move]["visits"] += 1
+        first_moves[move]["total_score"] += score
+
+    best_move = (0, 0)
+    best_avg = -1.0
+    for move, stats in first_moves.items():
+        if stats["visits"] > 0:
+            avg = stats["total_score"] / stats["visits"]
+            if avg > best_avg:
+                best_avg = avg
+                best_move = move
+
+    return best_move
 
 
 def predict_pacman_position(environment, pacman, steps=3):
@@ -209,21 +321,16 @@ class GhostAgent(Agent):
 
     def _pathfind_direction(self, environment, start, target):
         pathfinder = (self.pathfinder or "bfs").lower()
+        args = (environment.walls, environment.width, environment.height, start, target)
         if pathfinder == "astar":
-            return astar_direction(
-                environment.walls,
-                environment.width,
-                environment.height,
-                start,
-                target,
-            )
-        return bfs_direction(
-            environment.walls,
-            environment.width,
-            environment.height,
-            start,
-            target,
-        )
+            return astar_direction(*args)
+        if pathfinder == "dfs":
+            return dfs_direction(*args)
+        if pathfinder == "ucs":
+            return ucs_direction(*args)
+        if pathfinder == "mcts":
+            return mcts_direction(*args)
+        return bfs_direction(*args)
 
     def get_action(self, environment, **context):
         pacman = context.get("pacman")

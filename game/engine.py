@@ -1,4 +1,4 @@
-# moteur de jeu — gère les déplacements, collisions, score, vies, victoire/défaite
+# moteur de jeu - gere les deplacements, collisions, score, vies, victoire/defaite
 
 from game.agents import GhostMode
 

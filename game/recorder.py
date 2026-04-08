@@ -1,4 +1,4 @@
-# enregistreur de parties — sauvegarde et rejoue les parties en json
+# enregistreur de parties - sauvegarde et rejoue les parties en json
 
 import json
 import time

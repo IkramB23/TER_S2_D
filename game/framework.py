@@ -201,6 +201,30 @@ def compare_day6_strategies(maze, route_steps=250, seed=0):
                 "cooperative": False,
             }
         ],
+        "dfs_reactive": [
+            {
+                "spawn": ghost_spawn,
+                "pathfinder": "dfs",
+                "prediction_steps": 0,
+                "cooperative": False,
+            }
+        ],
+        "ucs_reactive": [
+            {
+                "spawn": ghost_spawn,
+                "pathfinder": "ucs",
+                "prediction_steps": 0,
+                "cooperative": False,
+            }
+        ],
+        "mcts_reactive": [
+            {
+                "spawn": ghost_spawn,
+                "pathfinder": "mcts",
+                "prediction_steps": 0,
+                "cooperative": False,
+            }
+        ],
         "bfs_predictive_k3": [
             {
                 "spawn": ghost_spawn,
@@ -275,6 +299,30 @@ def _default_experiments_for_spawn(spawn):
             {
                 "spawn": spawn,
                 "pathfinder": "astar",
+                "prediction_steps": 0,
+                "cooperative": False,
+            }
+        ],
+        "dfs_reactive": [
+            {
+                "spawn": spawn,
+                "pathfinder": "dfs",
+                "prediction_steps": 0,
+                "cooperative": False,
+            }
+        ],
+        "ucs_reactive": [
+            {
+                "spawn": spawn,
+                "pathfinder": "ucs",
+                "prediction_steps": 0,
+                "cooperative": False,
+            }
+        ],
+        "mcts_reactive": [
+            {
+                "spawn": spawn,
+                "pathfinder": "mcts",
                 "prediction_steps": 0,
                 "cooperative": False,
             }

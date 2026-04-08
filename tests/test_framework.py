@@ -1,7 +1,15 @@
 import tempfile
 from pathlib import Path
 
-from game.agents import astar_direction, predict_pacman_position, HumanAgent
+from game.agents import (
+    astar_direction,
+    bfs_direction,
+    dfs_direction,
+    ucs_direction,
+    mcts_direction,
+    predict_pacman_position,
+    HumanAgent,
+)
 from game.environment import Environment
 from game.framework import (
     compare_day6_strategies,
@@ -29,6 +37,36 @@ def test_astar_direction_returns_valid_step():
     assert step in [(1, 0), (0, 1)]
 
 
+def test_dfs_direction_returns_valid_step():
+    env, _ = _simple_env()
+    step = dfs_direction(env.walls, env.width, env.height, (1, 1), (3, 3))
+    assert step in [(1, 0), (0, 1)]
+
+
+def test_ucs_direction_returns_valid_step():
+    env, _ = _simple_env()
+    step = ucs_direction(env.walls, env.width, env.height, (1, 1), (3, 3))
+    assert step in [(1, 0), (0, 1)]
+
+
+def test_mcts_direction_returns_valid_step():
+    env, _ = _simple_env()
+    step = mcts_direction(env.walls, env.width, env.height, (1, 1), (3, 3))
+    assert step in [(1, 0), (0, 1)]
+
+
+def test_dfs_direction_no_path():
+    env, _ = _simple_env()
+    step = dfs_direction(env.walls, env.width, env.height, (1, 1), (1, 1))
+    assert step == (0, 0)
+
+
+def test_ucs_direction_no_path():
+    env, _ = _simple_env()
+    step = ucs_direction(env.walls, env.width, env.height, (1, 1), (1, 1))
+    assert step == (0, 0)
+
+
 def test_predict_pacman_position_moves_forward():
     env, _ = _simple_env()
     pacman = HumanAgent(1, 2)
@@ -43,6 +81,9 @@ def test_compare_day6_strategies_returns_expected_shape():
     assert "results" in report
     assert "bfs_reactive" in report["results"]
     assert "astar_reactive" in report["results"]
+    assert "dfs_reactive" in report["results"]
+    assert "ucs_reactive" in report["results"]
+    assert "mcts_reactive" in report["results"]
     assert "astar_predictive_k3" in report["results"]
     assert "team4_astar_coop_k3" in report["results"]
     assert "team4_astar_roles" in report["results"]

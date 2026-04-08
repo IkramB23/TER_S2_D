@@ -61,7 +61,7 @@ class TestEnvironment:
 
     def test_eat_empty_cell(self):
         env, _ = _make_env()
-        # Find a wall cell — eating there yields nothing
+        # Find a wall cell - eating there yields nothing
         wall = next(iter(env.walls))
         points, is_power = env.eat_pellet(*wall)
         assert points == 0

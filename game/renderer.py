@@ -1,4 +1,4 @@
-# rendu pygame — dessine le labyrinthe, pacman, fantômes, score, etc.
+# rendu pygame - dessine le labyrinthe, pacman, fantômes, score, etc.
 
 import pygame
 import math
@@ -47,10 +47,13 @@ class PacmanRenderer:
         self.offset_x = (self.window_w - maze_px_w) // 2
         self.offset_y = 120
 
-    def render(self, engine):
+    def render(self, engine, game_mode="normal", capture_tick=None, replay_ai="bfs"):
         # dessine une frame complète du jeu
         self.tick += 1
         self._last_score = engine.score
+        self._game_mode = game_mode
+        self._capture_tick = capture_tick
+        self._replay_ai = replay_ai
         self.screen.fill(self.BG_COLOR)
 
         self._calculate_layout(engine.env.width, engine.env.height)
@@ -159,7 +162,7 @@ class PacmanRenderer:
             else:
                 color = self.GHOST_COLORS.get(ghost.NAME, (255, 0, 0))
 
-            # corps du fantôme — dôme + rectangle + base ondulée
+            # corps du fantôme - dome + rectangle + base ondulee
             dome_rect = pygame.Rect(px - radius, py - radius, radius * 2, radius * 2)
             pygame.draw.circle(self.screen, color, (px, py - radius // 4), radius)
             pygame.draw.rect(self.screen, color,
@@ -191,16 +194,16 @@ class PacmanRenderer:
             pygame.draw.circle(self.screen, (0, 0, 80), (pupil_x, pupil_y), pupil_r)
 
     def _draw_hud(self, engine):
-        # score — côté gauche
+        # score - cote gauche
         score_surf = self.font.render(f"Score: {engine.score}", True, self.TEXT_COLOR)
         self.screen.blit(score_surf, (24, 16))
 
-        # vies — côté droit
+        # vies - cote droit
         lives_str = "\u2665 " * engine.lives
         lives_surf = self.font.render(f"Lives: {lives_str}", True, (255, 80, 80))
         self.screen.blit(lives_surf, (self.window_w - 220, 16))
 
-        # niveau — centre
+        # niveau - centre
         level_surf = self.small_font.render(f"Level {engine.level}", True, (210, 210, 210))
         self.screen.blit(level_surf, (self.window_w // 2 - 30, 16))
 
@@ -215,8 +218,19 @@ class PacmanRenderer:
         mode_surf = self.small_font.render(mode_text, True, (160, 160, 160))
         self.screen.blit(mode_surf, (24, 72))
 
+        # indicateur du mode de jeu
+        if self._game_mode == "solo":
+            tag = self.font.render("SOLO (sans fantômes)", True, (80, 255, 80))
+            self.screen.blit(tag, (self.window_w // 2 - 100, 50))
+        elif self._game_mode == "replay":
+            tag = self.font.render(f"REPLAY - IA : {self._replay_ai}", True, (80, 180, 255))
+            self.screen.blit(tag, (self.window_w // 2 - 100, 50))
+            if self._capture_tick is not None:
+                cap = self.font.render(f"Capture au tick {self._capture_tick}", True, (255, 100, 100))
+                self.screen.blit(cap, (self.window_w // 2 - 100, 74))
+
         # contrôles
-        controls = "Arrows/WASD: move | N: new maze | R: restart | P/M: browse | ESC: quit"
+        controls = "Arrows/WASD: move | N: new | R: restart | 1: solo | 2: replay | ESC: quit"
         ctrl_surf = self.small_font.render(controls, True, (140, 140, 140))
         self.screen.blit(ctrl_surf, (24, self.window_h - 50))
 
@@ -237,6 +251,17 @@ class PacmanRenderer:
         score_rect = score_surf.get_rect(center=(self.window_w // 2, self.window_h // 2 + 30))
         self.screen.blit(score_surf, score_rect)
 
-        hint = self.small_font.render("N: new maze  |  R: restart  |  ESC: quit", True, (200, 200, 200))
-        hint_rect = hint.get_rect(center=(self.window_w // 2, self.window_h // 2 + 65))
+        # affiche le tick de capture en mode replay
+        if self._game_mode == "replay" and self._capture_tick is not None:
+            cap_surf = self.font.render(
+                f"Capturé au tick {self._capture_tick}", True, (255, 180, 80)
+            )
+            cap_rect = cap_surf.get_rect(center=(self.window_w // 2, self.window_h // 2 + 60))
+            self.screen.blit(cap_surf, cap_rect)
+            hint_y = self.window_h // 2 + 95
+        else:
+            hint_y = self.window_h // 2 + 65
+
+        hint = self.small_font.render("N: new maze  |  R: restart  |  1: solo  |  2: replay  |  ESC: quit", True, (200, 200, 200))
+        hint_rect = hint.get_rect(center=(self.window_w // 2, hint_y))
         self.screen.blit(hint, hint_rect)

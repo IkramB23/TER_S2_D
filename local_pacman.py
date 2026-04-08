@@ -8,10 +8,11 @@ import requests
 
 from Proto.maze_Prim_loops import generate_pacman_maze
 from game.environment import Environment
-from game.agents import HumanAgent, BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost
+from game.agents import HumanAgent, BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost, GhostAgent
 from game.engine import GameEngine
 from game.recorder import GameRecorder
 from game.renderer import PacmanRenderer
+from game.framework import ReplayPacmanAgent, pacman_route_from_recording_frames
 
 
 DB_PATH = Path(__file__).parent / "mazes.db"
@@ -108,6 +109,12 @@ class LocalPacmanGame:
 
         self.renderer = PacmanRenderer(self.screen, self.window_w, self.window_h)
 
+        # mode du jeu : "normal", "solo", "replay"
+        self.game_mode = "normal"
+        self.replay_ai = "bfs"
+        self.capture_tick = None
+        self.solo_recording_path = None
+
         self._start_game()
 
     # ------------------------------------------------------------------
@@ -116,6 +123,8 @@ class LocalPacmanGame:
 
     def _start_game(self):
         # initialise le moteur de jeu avec le labyrinthe courant
+        self.game_mode = "normal"
+        self.capture_tick = None
         maze = self.current["maze"]
         self.env = Environment(maze)
 
@@ -145,6 +154,70 @@ class LocalPacmanGame:
 
         # moteur de jeu
         self.engine = GameEngine(self.env, self.pacman, self.ghosts, self.recorder)
+
+    def _start_solo_game(self):
+        # lance une partie sans fantômes pour enregistrer le trajet
+        self.game_mode = "solo"
+        self.capture_tick = None
+        maze = self.current["maze"]
+        self.env = Environment(maze)
+
+        pac_pos = self.env.find_pacman_spawn()
+        self.pacman = HumanAgent(*pac_pos)
+        self.ghosts = []
+
+        self.recorder = GameRecorder()
+        w, h = self.env.width, self.env.height
+        self.recorder.set_metadata(
+            maze, w, h,
+            cloud_id=self.current.get("cloud_id"),
+            agent_type="human_solo",
+        )
+        self.engine = GameEngine(self.env, self.pacman, self.ghosts, self.recorder)
+        print("mode solo : explorez le labyrinthe sans fantômes (enregistrement en cours)")
+
+    def _start_replay_game(self, pathfinder="bfs"):
+        # charge le dernier enregistrement solo et le rejoue avec des fantômes
+        RECORDINGS_DIR.mkdir(exist_ok=True)
+        files = sorted(RECORDINGS_DIR.glob("game_*.json"))
+        if not files:
+            print("aucun enregistrement trouvé dans recordings/")
+            return
+        rec_path = files[-1]
+        loaded = GameRecorder.load(rec_path)
+        route = pacman_route_from_recording_frames(loaded.frames)
+        if len(route) < 2:
+            print("enregistrement trop court pour rejouer")
+            return
+
+        self.game_mode = "replay"
+        self.replay_ai = pathfinder
+        self.capture_tick = None
+
+        maze = loaded.metadata.get("maze")
+        if not maze:
+            print("enregistrement invalide (pas de labyrinthe)")
+            return
+        self.env = Environment(maze)
+
+        self.pacman = ReplayPacmanAgent(route)
+        ghost_spawns = self.env.find_ghost_spawns(4)
+        w, h = self.env.width, self.env.height
+        ghost_classes = [BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost]
+        self.ghosts = []
+        for i, cls in enumerate(ghost_classes):
+            gx, gy = ghost_spawns[i] if i < len(ghost_spawns) else ghost_spawns[0]
+            self.ghosts.append(cls(gx, gy, w, h, pathfinder=pathfinder))
+
+        self.recorder = GameRecorder()
+        self.recorder.set_metadata(
+            maze, w, h,
+            cloud_id=loaded.metadata.get("cloud_id"),
+            agent_type=f"replay_{pathfinder}",
+        )
+        self.engine = GameEngine(self.env, self.pacman, self.ghosts, self.recorder)
+        self.solo_recording_path = str(rec_path)
+        print(f"mode replay : {rec_path.name} avec IA {pathfinder}")
 
     # ------------------------------------------------------------------
     #  gestion des labyrinthes (api + stockage local)
@@ -231,8 +304,18 @@ class LocalPacmanGame:
             # avancer la logique du jeu
             self.engine.tick()
 
+            # détecter le tick de capture en mode replay
+            if self.game_mode == "replay" and self.capture_tick is None:
+                if self.engine.game_over:
+                    self.capture_tick = self.engine.tick_count
+
             # rendu graphique
-            self.renderer.render(self.engine)
+            self.renderer.render(
+                self.engine,
+                game_mode=self.game_mode,
+                capture_tick=self.capture_tick,
+                replay_ai=self.replay_ai,
+            )
             self.clock.tick(60)
 
         # sauvegarder l'enregistrement en quittant
@@ -244,15 +327,19 @@ class LocalPacmanGame:
     def _handle_key(self, event, running):
         char = event.unicode
 
-        # déplacement (entrée de l'agent pacman)
+        # deplacement (entree de l'agent pacman - seulement en mode humain)
         if event.key in (pygame.K_LEFT, pygame.K_a):
-            self.pacman.set_direction(-1, 0)
+            if hasattr(self.pacman, 'set_direction'):
+                self.pacman.set_direction(-1, 0)
         elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            self.pacman.set_direction(1, 0)
+            if hasattr(self.pacman, 'set_direction'):
+                self.pacman.set_direction(1, 0)
         elif event.key in (pygame.K_UP, pygame.K_w):
-            self.pacman.set_direction(0, -1)
+            if hasattr(self.pacman, 'set_direction'):
+                self.pacman.set_direction(0, -1)
         elif event.key in (pygame.K_DOWN, pygame.K_s):
-            self.pacman.set_direction(0, 1)
+            if hasattr(self.pacman, 'set_direction'):
+                self.pacman.set_direction(0, 1)
 
         # nouveau labyrinthe
         elif event.key == pygame.K_n:
@@ -293,6 +380,23 @@ class LocalPacmanGame:
             self._rate_current_maze(4)
         elif event.key == pygame.K_F5:
             self._rate_current_maze(5)
+
+        # mode solo (sans fantomes) - touche 1 ou F6
+        elif event.key in (pygame.K_1, pygame.K_F6):
+            # sauvegarder la partie en cours avant de passer en solo
+            if self.recorder.total_frames > 0:
+                self._save_recording()
+            self._start_solo_game()
+
+        # mode replay (avec fantomes et IA) - touche 2 ou F7
+        elif event.key in (pygame.K_2, pygame.K_F7):
+            # sauvegarder la partie solo en cours avant le replay
+            if self.recorder.total_frames > 0:
+                self._save_recording()
+            algos = ["bfs", "astar", "dfs", "ucs", "mcts"]
+            idx = algos.index(self.replay_ai) if self.replay_ai in algos else -1
+            self.replay_ai = algos[(idx + 1) % len(algos)]
+            self._start_replay_game(self.replay_ai)
 
         # quitter
         elif event.key == pygame.K_ESCAPE:

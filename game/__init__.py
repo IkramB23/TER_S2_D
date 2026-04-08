@@ -1,4 +1,4 @@
-"""Pac-Man game module — Environment, Agents, Engine, Recorder, Renderer."""
+"""Pac-Man game module - Environment, Agents, Engine, Recorder, Renderer."""
 
 from game.environment import Environment
 from game.agents import HumanAgent, BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost, GhostMode
