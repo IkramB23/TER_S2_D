@@ -1,4 +1,4 @@
-# agents — pacman (humain / futur IA) et fantômes (chacun avec une IA différente)
+# agents — pac-man (humain / futur ia) et fantômes (chacun avec une ia différente)
 
 from abc import ABC, abstractmethod
 from collections import deque
@@ -19,7 +19,7 @@ class GhostMode:
 DIRECTIONS = [(0, -1), (0, 1), (-1, 0), (1, 0)]
 
 def bfs_direction(walls, width, height, start, target):
-    # bfs : donne (dx, dy) du premier pas vers la cible
+    # bfs: donne (dx, dy) du premier pas vers la cible
     if start == target:
         return (0, 0)
 
@@ -46,12 +46,12 @@ def _manhattan(a, b):
 
 
 def astar_direction(walls, width, height, start, target):
-    # a* : donne (dx, dy) du premier pas vers la cible
+    # a*: donne (dx, dy) du premier pas vers la cible
     if start == target:
         return (0, 0)
 
     best_g = {start: 0}
-    # (f, g, x, y, first_dir)
+    # (f=cout_total, g=cout_reel, x, y, first_dir)
     heap = [(_manhattan(start, target), 0, start[0], start[1], None)]
 
     while heap:
@@ -83,7 +83,7 @@ def astar_direction(walls, width, height, start, target):
 
 
 def predict_pacman_position(environment, pacman, steps=3):
-    # simple projection de la position future de pac-man
+    # projection simple de la position future de pac-man en k pas
     x, y = pacman.x, pacman.y
     dx, dy = pacman.direction
     if (dx, dy) == (0, 0):
@@ -115,7 +115,7 @@ class Agent(ABC):
         pass
 
     def reset(self):
-        # remet l'agent à sa position de départ
+        # remet l'agent à sa position de départ en réinitialisant
         self.x = self.start_x
         self.y = self.start_y
         self.direction = (0, 0)
@@ -124,7 +124,7 @@ class Agent(ABC):
 # --- agent pac-man ---
 
 class HumanAgent(Agent):
-    # pac-man contrôlé par le clavier
+    # pac-man contrôlé par le clavier du joueur
 
     def __init__(self, x, y):
         super().__init__(x, y)
@@ -134,14 +134,14 @@ class HumanAgent(Agent):
         self.next_direction = (dx, dy)
 
     def get_action(self, environment, **context):
-        # essaie la direction demandée
+        # essaie d'aller dans la direction demandée par le joueur
         nx = self.x + self.next_direction[0]
         ny = self.y + self.next_direction[1]
         if self.next_direction != (0, 0) and environment.is_corridor(nx, ny):
             self.direction = self.next_direction
             return self.direction
 
-        # sinon continue dans la direction actuelle
+        # sinon continue dans la direction actuelle si c'est possible
         nx = self.x + self.direction[0]
         ny = self.y + self.direction[1]
         if environment.is_corridor(nx, ny):
@@ -153,7 +153,7 @@ class HumanAgent(Agent):
 # --- agents fantômes ---
 
 class GhostAgent(Agent):
-    # fantôme de base avec ia, chaque sous-classe définit sa cible
+    # fantôme de base avec ia; chaque sous-classe redéfinit sa cible
 
     COLOR = (255, 0, 0)
     NAME = "Ghost"
@@ -179,10 +179,11 @@ class GhostAgent(Agent):
         self.cooperative = cooperative
 
     def get_target(self, environment, pacman, ghosts):
-        # à redéfinir dans chaque sous-classe
+        # redéfinir cette méthode dans les sous-classes pour des comportements spécifiques
         if self.mode == GhostMode.SCATTER:
             return self.scatter_target
 
+        # prédit la position future de pac-man si activé
         if self.prediction_steps > 0:
             tx, ty = predict_pacman_position(
                 environment, pacman, steps=self.prediction_steps
@@ -190,6 +191,7 @@ class GhostAgent(Agent):
         else:
             tx, ty = pacman.x, pacman.y
 
+        # mode coopératif: décale la cible pour éviter que les fantômes se rassemblent
         if self.cooperative and ghosts:
             try:
                 idx = ghosts.index(self)
@@ -200,6 +202,7 @@ class GhostAgent(Agent):
             tx += ox
             ty += oy
 
+        # clamp la cible pour qu'elle reste dans le labyrinthe
         tx = max(0, min(environment.width - 1, tx))
         ty = max(0, min(environment.height - 1, ty))
         return (tx, ty)
@@ -227,14 +230,15 @@ class GhostAgent(Agent):
         ghosts = context.get("ghosts", [])
 
         if self.mode == GhostMode.CAGED:
-            # les fantômes en cage ne bougent pas
+            # en cage: ne pas bouger
             return (0, 0)
 
         if self.mode == GhostMode.FRIGHTENED:
+            # en mode effrayé: mouvement aléatoire
             return self._random_direction(environment)
 
         if self.mode == GhostMode.EATEN:
-            # retour au point de départ
+            # retour au point de départ quand mangé
             return self._pathfind_direction(
                 environment,
                 (self.x, self.y),
@@ -265,7 +269,7 @@ class GhostAgent(Agent):
         return valid[0] if valid else (0, 0)
 
     def set_frightened(self, duration=480):
-        # passe en mode effrayé (quand pac-man mange une grosse bille)
+        # passer en mode effrayé (quand pac-man mange une grosse bille)
         if self.mode != GhostMode.EATEN:
             self.mode = GhostMode.FRIGHTENED
             self.frightened_timer = duration
@@ -277,10 +281,11 @@ class GhostAgent(Agent):
             if self.frightened_timer <= 0:
                 self.mode = global_mode
         elif self.mode == GhostMode.EATEN:
+            # dés qu'au spawn: revenir au mode global
             if (self.x, self.y) == (self.start_x, self.start_y):
                 self.mode = global_mode
         elif self.mode == GhostMode.CAGED:
-            # reste en cage jusqu'à que global_mode change (fin de la phase CAGED)
+            # sortir de la cage quand le mode global change
             if global_mode != GhostMode.CAGED:
                 self.mode = global_mode
         else:
@@ -288,7 +293,7 @@ class GhostAgent(Agent):
 
 
 class BlinkyGhost(GhostAgent):
-    # rouge : cible directement la position de pacman (chasseur)
+    # rouge: cible directement pac-man (chasseur agressif)
     COLOR = (255, 0, 0)
     NAME = "Blinky"
 
@@ -320,7 +325,7 @@ class BlinkyGhost(GhostAgent):
 
 
 class PinkyGhost(GhostAgent):
-    # rose : cible 4 cases devant pacman (embuscade)
+    # rose: cible 4 cases devant pac-man (embuscade)
     COLOR = (255, 184, 255)
     NAME = "Pinky"
 
@@ -353,7 +358,7 @@ class PinkyGhost(GhostAgent):
 
 
 class InkyGhost(GhostAgent):
-    # cyan : utilise la position de blinky + pacman (imprévisible)
+    # cyan: utilise la position de blinky + pac-man (imprévisible)
     COLOR = (0, 255, 255)
     NAME = "Inky"
 
@@ -395,7 +400,7 @@ class InkyGhost(GhostAgent):
 
 
 class ClydeGhost(GhostAgent):
-    # orange : chasse quand loin, fuit quand proche (timide)
+    # orange: chasse quand loin, se retire quand proche (timide)
     COLOR = (255, 184, 82)
     NAME = "Clyde"
 

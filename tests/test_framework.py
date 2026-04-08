@@ -44,6 +44,8 @@ def test_compare_day6_strategies_returns_expected_shape():
     assert "bfs_reactive" in report["results"]
     assert "astar_reactive" in report["results"]
     assert "astar_predictive_k3" in report["results"]
+    assert "team4_astar_coop_k3" in report["results"]
+    assert "team4_astar_roles" in report["results"]
     assert isinstance(report["results"]["bfs_reactive"]["captured"], bool)
 
 
@@ -105,3 +107,5 @@ def test_compare_strategies_over_seeds_returns_summary():
     assert "strategies" in report["summary"]
     assert "bfs_reactive" in report["summary"]["strategies"]
     assert "astar_reactive" in report["summary"]["strategies"]
+    assert "team4_astar_coop_k3" in report["summary"]["strategies"]
+    assert "team4_astar_roles" in report["summary"]["strategies"]

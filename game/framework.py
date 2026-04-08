@@ -1,10 +1,19 @@
 """cadre simple pour comparer les méthodes"""
 
 import copy
+import inspect
 import random
 from pathlib import Path
 
-from game.agents import Agent, GhostAgent, GhostMode
+from game.agents import (
+    Agent,
+    BlinkyGhost,
+    ClydeGhost,
+    GhostAgent,
+    GhostMode,
+    InkyGhost,
+    PinkyGhost,
+)
 from game.engine import GameEngine
 from game.environment import Environment
 from game.recorder import GameRecorder
@@ -65,27 +74,35 @@ def generate_random_route(environment, start, steps=250, seed=0):
 
 def _run_single_experiment(maze, pacman_route, ghost_specs, max_ticks=1200):
     env = Environment(copy.deepcopy(maze))
-    # on garde seulement la chasse.
+    # garder seulement la phase de chasse (pas de billes à manger)
     env.pellets.clear()
     env.power_pellets.clear()
-    # on évite une victoire tout de suite.
+    # mettre une fausse bille pour éviter une victoire immédiate
     env.pellets.add((-1, -1))
 
     pacman = ReplayPacmanAgent(pacman_route)
     ghosts = []
     for spec in ghost_specs:
+        ghost_cls = spec.get("ghost_class", GhostAgent)
         spawn = spec.get("spawn")
         if spawn is None:
             spawn = env.find_ghost_spawns(1)[0]
+
+        ctor_params = inspect.signature(ghost_cls.__init__).parameters
+        kwargs = {
+            "pathfinder": spec.get("pathfinder", "bfs"),
+            "cooperative": spec.get("cooperative", False),
+        }
+        if "prediction_steps" in ctor_params:
+            kwargs["prediction_steps"] = spec.get("prediction_steps", 0)
+
         ghosts.append(
-            GhostAgent(
+            ghost_cls(
                 spawn[0],
                 spawn[1],
                 env.width,
                 env.height,
-                pathfinder=spec.get("pathfinder", "bfs"),
-                prediction_steps=spec.get("prediction_steps", 0),
-                cooperative=spec.get("cooperative", False),
+                **kwargs,
             )
         )
 
@@ -94,7 +111,7 @@ def _run_single_experiment(maze, pacman_route, ghost_specs, max_ticks=1200):
     engine.ghost_speed = 1
     engine.ghost_frightened_speed = 1
 
-    # on force les fantômes en mode chase.
+    # forcer les fantômes en mode chase (poursuite)
     engine.current_ghost_mode = GhostMode.CHASE
     engine.ghost_mode_timer = -1
     for ghost in engine.ghosts:
@@ -126,7 +143,46 @@ def compare_day6_strategies(maze, route_steps=250, seed=0):
     env = Environment(copy.deepcopy(maze))
     pacman_start = env.find_pacman_spawn()
     route = generate_random_route(env, pacman_start, steps=route_steps, seed=seed)
-    ghost_spawn = env.find_ghost_spawns(1)[0]
+    team_spawns = env.find_ghost_spawns(4)
+    ghost_spawn = team_spawns[0]
+
+    team4_astar_coop = []
+    for i in range(4):
+        team4_astar_coop.append(
+            {
+                "spawn": team_spawns[i % len(team_spawns)],
+                "pathfinder": "astar",
+                "prediction_steps": 3,
+                "cooperative": True,
+            }
+        )
+
+    team4_roles_astar = [
+        {
+            "spawn": team_spawns[0 % len(team_spawns)],
+            "ghost_class": BlinkyGhost,
+            "pathfinder": "astar",
+            "cooperative": False,
+        },
+        {
+            "spawn": team_spawns[1 % len(team_spawns)],
+            "ghost_class": PinkyGhost,
+            "pathfinder": "astar",
+            "cooperative": False,
+        },
+        {
+            "spawn": team_spawns[2 % len(team_spawns)],
+            "ghost_class": InkyGhost,
+            "pathfinder": "astar",
+            "cooperative": False,
+        },
+        {
+            "spawn": team_spawns[3 % len(team_spawns)],
+            "ghost_class": ClydeGhost,
+            "pathfinder": "astar",
+            "cooperative": False,
+        },
+    ]
 
     experiments = {
         "bfs_reactive": [
@@ -163,13 +219,15 @@ def compare_day6_strategies(maze, route_steps=250, seed=0):
         ],
         "team4_bfs_coop": [
             {
-                "spawn": ghost_spawn,
+                "spawn": team_spawns[i % len(team_spawns)],
                 "pathfinder": "bfs",
                 "prediction_steps": 2,
                 "cooperative": True,
             }
-            for _ in range(4)
+            for i in range(4)
         ],
+        "team4_astar_coop_k3": team4_astar_coop,
+        "team4_astar_roles": team4_roles_astar,
     }
 
     results = {}
@@ -203,6 +261,7 @@ def pacman_route_from_recording_frames(frames):
 
 
 def _default_experiments_for_spawn(spawn):
+    team_spawns = [spawn, spawn, spawn, spawn]
     return {
         "bfs_reactive": [
             {
@@ -238,12 +297,47 @@ def _default_experiments_for_spawn(spawn):
         ],
         "team4_bfs_coop": [
             {
-                "spawn": spawn,
+                "spawn": team_spawns[i],
                 "pathfinder": "bfs",
                 "prediction_steps": 2,
                 "cooperative": True,
             }
-            for _ in range(4)
+            for i in range(4)
+        ],
+        "team4_astar_coop_k3": [
+            {
+                "spawn": team_spawns[i],
+                "pathfinder": "astar",
+                "prediction_steps": 3,
+                "cooperative": True,
+            }
+            for i in range(4)
+        ],
+        "team4_astar_roles": [
+            {
+                "spawn": team_spawns[0],
+                "ghost_class": BlinkyGhost,
+                "pathfinder": "astar",
+                "cooperative": False,
+            },
+            {
+                "spawn": team_spawns[1],
+                "ghost_class": PinkyGhost,
+                "pathfinder": "astar",
+                "cooperative": False,
+            },
+            {
+                "spawn": team_spawns[2],
+                "ghost_class": InkyGhost,
+                "pathfinder": "astar",
+                "cooperative": False,
+            },
+            {
+                "spawn": team_spawns[3],
+                "ghost_class": ClydeGhost,
+                "pathfinder": "astar",
+                "cooperative": False,
+            },
         ],
     }
 
