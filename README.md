@@ -41,7 +41,7 @@ python local_pacman.py
 python app.py
 ```
 
-Ou via le deploiement Render : https://ter-s2-d.onrender.com
+Ou via le deploiement Render : https://ter-s2-d-85u5.onrender.com
 
 ### Routes API
 
@@ -117,7 +117,7 @@ python -c "from game.framework import compare_day6_strategies; print(compare_day
 Ou via l'API :
 
 ```bash
-curl -X POST https://ter-s2-d.onrender.com/ai/benchmark
+curl -X POST https://ter-s2-d-85u5.onrender.com/ai/benchmark
 ```
 
 ## Base de donnees
@@ -131,4 +131,4 @@ curl -X POST https://ter-s2-d.onrender.com/ai/benchmark
 ## CI/CD
 
 - GitHub Actions execute les 51 tests a chaque push
-- Deploiement automatique sur Render (https://ter-s2-d.onrender.com)
+- Deploiement automatique sur Render (https://ter-s2-d-85u5.onrender.com)

@@ -3,8 +3,8 @@ import requests
 
 
 URL_CANDIDATES = [
-	"https://ter-s2-d.onrender.com/maze",
-	"https://ter-s2-d.onrender.com/api/maze",
+	"https://ter-s2-d-85u5.onrender.com/maze",
+	"https://ter-s2-d-85u5.onrender.com/api/maze",
 ]
 
 

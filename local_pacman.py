@@ -16,7 +16,7 @@ from game.framework import ReplayPacmanAgent, pacman_route_from_recording_frames
 
 
 DB_PATH = Path(__file__).parent / "mazes.db"
-API_URL = "https://ter-s2-d.onrender.com"
+API_URL = "https://ter-s2-d-85u5.onrender.com"
 RECORDINGS_DIR = Path(__file__).parent / "recordings"
 
 
