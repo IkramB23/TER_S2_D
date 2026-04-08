@@ -1,6 +1,5 @@
 # Pac-Man TER S2 - Groupe D
 
-Projet universitaire : jeu Pac-Man avec generation de labyrinthes, IA de poursuite et benchmark.
 
 ## Installation
 
