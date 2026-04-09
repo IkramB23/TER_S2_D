@@ -23,7 +23,7 @@ python local_pacman.py
 | P / M | Parcourir les labyrinthes sauvegardes |
 | +/- | Changer la taille du labyrinthe |
 | Numpad 0/2/4 | Changer le % de boucles (0%, 25%, 40%) |
-| F1 a F5 | Noter le labyrinthe (1 a 5 etoiles) |
+| 0, 3-7 | Noter le labyrinthe (0=bad a 5=good) |
 | 1 | Mode solo (sans fantomes, enregistre le trajet) |
 | 2 | Mode replay (rejoue le trajet avec fantomes IA) |
 | ESC | Quitter |
@@ -49,7 +49,7 @@ Ou via le deploiement Render : https://ter-s2-d-85u5.onrender.com
 |---------|-------|-------------|
 | GET | `/` | Page d'accueil |
 | GET | `/maze` | Generer un labyrinthe (params: width, height, loop_percent) |
-| POST | `/maze/<id>/rate` | Noter un labyrinthe (body: {"rating": 1-5}) |
+| POST | `/maze/<id>/rate` | Noter un labyrinthe (body: {"rating": 0-5}) |
 | GET | `/ai/algorithms` | Liste des algorithmes disponibles |
 | POST | `/ai/benchmark` | Lancer un benchmark (body: {"maze", "route", "strategies"}) |
 
