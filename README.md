@@ -22,7 +22,6 @@ python local_pacman.py
 | R | Relancer la partie |
 | P / M | Parcourir les labyrinthes sauvegardes |
 | +/- | Changer la taille du labyrinthe |
-| Numpad 0/2/4 | Changer le % de boucles (0%, 25%, 40%) |
 | 0, 3-7 | Noter le labyrinthe (0=bad a 5=good) |
 | 1 | Mode solo (sans fantomes, enregistre le trajet) |
 | 2 | Mode replay (rejoue le trajet avec fantomes IA) |
