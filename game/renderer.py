@@ -47,13 +47,14 @@ class PacmanRenderer:
         self.offset_x = (self.window_w - maze_px_w) // 2
         self.offset_y = 120
 
-    def render(self, engine, game_mode="normal", capture_tick=None, replay_ai="bfs"):
+    def render(self, engine, game_mode="normal", capture_tick=None, replay_ai="bfs", rating_message=None):
         # dessine une frame complète du jeu
         self.tick += 1
         self._last_score = engine.score
         self._game_mode = game_mode
         self._capture_tick = capture_tick
         self._replay_ai = replay_ai
+        self._rating_message = rating_message
         self.screen.fill(self.BG_COLOR)
 
         self._calculate_layout(engine.env.width, engine.env.height)
@@ -234,9 +235,14 @@ class PacmanRenderer:
         ctrl_surf = self.small_font.render(controls, True, (140, 140, 140))
         self.screen.blit(ctrl_surf, (24, self.window_h - 50))
 
-        rating_info = "F1-F5: rate maze | +/-: size | Numpad 0/2/4: loops%"
+        rating_info = "0-7: rate maze | +/-: size | Numpad 0/2/4: loops%"
         rating_surf = self.small_font.render(rating_info, True, (120, 120, 120))
         self.screen.blit(rating_surf, (24, self.window_h - 28))
+
+        # message de notation
+        if self._rating_message:
+            msg_surf = self.font.render(self._rating_message, True, (255, 220, 50))
+            self.screen.blit(msg_surf, (self.window_w // 2 - msg_surf.get_width() // 2, 92))
 
     def _draw_overlay(self, text, color):
         overlay = pygame.Surface((self.window_w, self.window_h), pygame.SRCALPHA)

@@ -99,9 +99,9 @@ class LocalPacmanGame:
         self.current_index = len(self.maze_ids) - 1
         self.current = self.repo.get_maze(self.maze_ids[self.current_index])
 
-        self.window_w = 960
-        self.window_h = 800
-        self.screen = pygame.display.set_mode((self.window_w, self.window_h))
+        self.window_w = 860
+        self.window_h = 720
+        self.screen = pygame.display.set_mode((self.window_w, self.window_h), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
 
         self.target_size = 21
@@ -114,6 +114,8 @@ class LocalPacmanGame:
         self.replay_ai = "bfs"
         self.capture_tick = None
         self.solo_recording_path = None
+        self.rating_message = None
+        self.rating_message_time = 0
 
         self._start_game()
 
@@ -267,16 +269,25 @@ class LocalPacmanGame:
     def _rate_current_maze(self, rating):
         cloud_id = self.current.get("cloud_id")
         if not cloud_id:
+            self.rating_message = "Pas de cloud ID - appuyer N d'abord"
+            self.rating_message_time = time.time()
             print("Cannot rate: this maze has no cloud ID.")
             return
         try:
             url = f"{API_URL}/maze/{cloud_id}/rate"
             response = requests.post(url, json={"rating": rating}, timeout=3)
             if response.status_code == 200:
+                self.rating_message = f"Note {rating}/5 envoyee !"
+                self.rating_message_time = time.time()
                 print(f"Maze {cloud_id} rated: {rating}/5 !")
             else:
-                print(f"Rating error: {response.json()}")
+                err = response.json().get("error", "inconnue")
+                self.rating_message = f"Erreur {response.status_code}: {err[:40]}"
+                self.rating_message_time = time.time()
+                print(f"Rating error {response.status_code}: {err}")
         except Exception as e:
+            self.rating_message = f"Erreur connexion"
+            self.rating_message_time = time.time()
             print(f"Rating send error: {e}")
 
     def _save_recording(self):
@@ -298,6 +309,11 @@ class LocalPacmanGame:
                 if event.type == pygame.QUIT:
                     running = False
 
+                if event.type == pygame.VIDEORESIZE:
+                    self.window_w, self.window_h = event.w, event.h
+                    self.screen = pygame.display.set_mode((self.window_w, self.window_h), pygame.RESIZABLE)
+                    self.renderer = PacmanRenderer(self.screen, self.window_w, self.window_h)
+
                 if event.type == pygame.KEYDOWN:
                     running = self._handle_key(event, running)
 
@@ -309,12 +325,18 @@ class LocalPacmanGame:
                 if self.engine.game_over:
                     self.capture_tick = self.engine.tick_count
 
+            # effacer le message de notation apres 3 secondes
+            rating_msg = None
+            if self.rating_message and (time.time() - self.rating_message_time) < 3:
+                rating_msg = self.rating_message
+
             # rendu graphique
             self.renderer.render(
                 self.engine,
                 game_mode=self.game_mode,
                 capture_tick=self.capture_tick,
                 replay_ai=self.replay_ai,
+                rating_message=rating_msg,
             )
             self.clock.tick(60)
 
@@ -369,16 +391,18 @@ class LocalPacmanGame:
         elif event.key == pygame.K_KP4:
             self._set_target_loop(40)
 
-        # noter le labyrinthe (F1-F5)
-        elif event.key == pygame.K_F1:
+        # noter le labyrinthe (touches 0-5 : 0=bad, 5=good)
+        elif event.key == pygame.K_0:
+            self._rate_current_maze(0)
+        elif event.key in (pygame.K_3, pygame.K_F1):
             self._rate_current_maze(1)
-        elif event.key == pygame.K_F2:
+        elif event.key in (pygame.K_4, pygame.K_F2):
             self._rate_current_maze(2)
-        elif event.key == pygame.K_F3:
+        elif event.key in (pygame.K_5, pygame.K_F3):
             self._rate_current_maze(3)
-        elif event.key == pygame.K_F4:
+        elif event.key in (pygame.K_6, pygame.K_F4):
             self._rate_current_maze(4)
-        elif event.key == pygame.K_F5:
+        elif event.key in (pygame.K_7, pygame.K_F5):
             self._rate_current_maze(5)
 
         # mode solo (sans fantomes) - touche 1 ou F6
