@@ -166,11 +166,13 @@ def list_recordings():
     try:
         cursor = recordings_collection.find(
             {}, {"frames": 0, "metadata.maze": 0}
-        ).sort("metadata.recorded_at", -1).limit(100)
+        ).limit(200)
         results = []
         for doc in cursor:
             doc["id"] = str(doc.pop("_id"))
             results.append(doc)
+        # tri par date décroissante en Python (évite la limite mémoire MongoDB M0)
+        results.sort(key=lambda r: r.get("metadata", {}).get("recorded_at", 0), reverse=True)
         return jsonify({"recordings": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
