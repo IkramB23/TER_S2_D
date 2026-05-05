@@ -142,9 +142,16 @@ def save_recording():
     rec_id = str(uuid.uuid4())
     try:
         doc = {"_id": rec_id}
-        doc["metadata"] = data.get("metadata", {})
-        doc["total_frames"] = data.get("total_frames", 0)
-        doc["frames"] = data.get("frames", [])
+        meta = data.get("metadata", {})
+        frames = data.get("frames", [])
+        # enrichir score_final et nb_frames si absents (anciens enregistrements)
+        if "score_final" not in meta and frames:
+            meta["score_final"] = frames[-1].get("score", 0)
+        if "nb_frames" not in meta:
+            meta["nb_frames"] = len(frames)
+        doc["metadata"] = meta
+        doc["total_frames"] = data.get("total_frames", len(frames))
+        doc["frames"] = frames
         recordings_collection.insert_one(doc)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -165,6 +172,28 @@ def list_recordings():
             doc["id"] = str(doc.pop("_id"))
             results.append(doc)
         return jsonify({"recordings": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/recordings/fix_scores", methods=["POST"])
+def fix_scores():
+    """Met à jour score_final et nb_frames pour les enregistrements qui n'en ont pas."""
+    if recordings_collection is None:
+        return jsonify({"error": "Base de données non configurée"}), 503
+    updated = 0
+    try:
+        cursor = recordings_collection.find({"metadata.score_final": {"$exists": False}})
+        for doc in cursor:
+            frames = doc.get("frames", [])
+            score_final = frames[-1].get("score", 0) if frames else 0
+            nb_frames = len(frames)
+            recordings_collection.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"metadata.score_final": score_final, "metadata.nb_frames": nb_frames}}
+            )
+            updated += 1
+        return jsonify({"updated": updated})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

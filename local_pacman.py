@@ -102,58 +102,65 @@ def show_ai_pacman_menu(screen, clock):
 
 
 def show_replay_browser(screen, clock):
-    """Affiche la liste des enregistrements locaux ET cloud disponibles.
-    Retourne le chemin (str) du fichier sélectionné, ou None pour annuler."""
+    """Affiche la liste des enregistrements depuis MongoDB.
+    Retourne le chemin local (str) du fichier téléchargé, ou None pour annuler."""
+    import threading, datetime
     font_title = pygame.font.SysFont("monospace", 38, bold=True)
     font_item  = pygame.font.SysFont("monospace", 20)
     font_hint  = pygame.font.SysFont("monospace", 16)
 
-    RECORDINGS_DIR.mkdir(exist_ok=True)
+    # --- requête dans un thread pour ne pas bloquer pygame ---
+    result = {"entries": None, "error": None}
 
-    # --- charger les enregistrements locaux ---
-    local_files = sorted(RECORDINGS_DIR.glob("game_*.json"), reverse=True)
-    entries = []
-    local_cloud_ids = set()
-
-    for f in local_files:
+    def _fetch():
         try:
-            with open(f, "r", encoding="utf-8") as fh:
-                raw = json.load(fh)
-            meta  = raw.get("metadata", {})
-            score = meta.get("score_final", "?")
-            agent = meta.get("agent_type", "?")
-            ts    = meta.get("recorded_at", 0)
-            nb    = meta.get("nb_frames", raw.get("total_frames", "?"))
-            cid   = raw.get("cloud_id") or meta.get("cloud_id")
-            if cid:
-                local_cloud_ids.add(cid)
-            import datetime
-            date_str = datetime.datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else "?"
-            tag   = "[local+cloud]" if cid else "[local]      "
-            label = f"{date_str}  {tag}  {agent:<14} score {score:<6} frames {nb}"
-            entries.append({"path": str(f), "label": label, "source": "local"})
-        except Exception:
-            entries.append({"path": str(f), "label": f.name, "source": "local"})
+            resp = requests.get(f"{API_URL}/recordings", timeout=60)
+            if resp.status_code == 200:
+                entries = []
+                for rec in resp.json().get("recordings", []):
+                    cid   = rec.get("id", "")
+                    meta  = rec.get("metadata", {})
+                    score = meta.get("score_final", "?")
+                    agent = meta.get("agent_type", "?")
+                    ts    = meta.get("recorded_at", 0)
+                    nb    = rec.get("total_frames", meta.get("nb_frames", "?"))
+                    date_str = datetime.datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else "?"
+                    label = f"{date_str}   {agent:<16}  score {score:<6}  frames {nb}"
+                    entries.append({"cloud_id": cid, "label": label})
+                result["entries"] = entries
+            else:
+                result["error"] = f"Erreur serveur : {resp.status_code}"
+        except Exception as e:
+            result["error"] = str(e)
 
-    # --- charger les enregistrements cloud uniquement (pas encore en local) ---
-    try:
-        resp = requests.get(f"{API_URL}/recordings", timeout=5)
-        if resp.status_code == 200:
-            import datetime
-            for rec in resp.json().get("recordings", []):
-                cid = rec.get("id", "")
-                if cid in local_cloud_ids:
-                    continue  # déjà affiché dans la liste locale
-                meta  = rec.get("metadata", {})
-                score = meta.get("score_final", "?")
-                agent = meta.get("agent_type", "?")
-                ts    = meta.get("recorded_at", 0)
-                nb    = rec.get("total_frames", meta.get("nb_frames", "?"))
-                date_str = datetime.datetime.fromtimestamp(ts).strftime("%d/%m/%Y %H:%M") if ts else "?"
-                label = f"{date_str}  [cloud]       {agent:<14} score {score:<6} frames {nb}"
-                entries.append({"path": None, "cloud_id": cid, "label": label, "source": "cloud"})
-    except Exception as e:
-        print(f"Impossible de récupérer les replays cloud: {e}")
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
+
+    # --- écran de chargement animé pendant la requête ---
+    dots = 0
+    dot_timer = 0
+    while t.is_alive():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return None
+        W, H = screen.get_size()
+        screen.fill((0, 0, 0))
+        dot_timer += 1
+        if dot_timer % 20 == 0:
+            dots = (dots + 1) % 4
+        loading = font_title.render("Chargement" + "." * dots, True, (255, 220, 40))
+        screen.blit(loading, (W // 2 - loading.get_width() // 2, H // 2 - 30))
+        sub = font_hint.render("Connexion à MongoDB en cours…", True, (120, 120, 120))
+        screen.blit(sub, (W // 2 - sub.get_width() // 2, H // 2 + 20))
+        hint = font_hint.render("ESC pour annuler", True, (60, 60, 60))
+        screen.blit(hint, (W // 2 - hint.get_width() // 2, H - 50))
+        pygame.display.flip()
+        clock.tick(30)
+
+    entries = result["entries"] or []
+    error   = result["error"]
 
     if not entries:
         waiting = True
@@ -163,10 +170,16 @@ def show_replay_browser(screen, clock):
                     waiting = False
             W, H = screen.get_size()
             screen.fill((0, 0, 0))
-            msg = font_title.render("Aucun enregistrement disponible", True, (220, 80, 80))
-            screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - 20))
-            hint = font_hint.render("Appuyez sur une touche pour revenir", True, (120, 120, 120))
-            screen.blit(hint, (W // 2 - hint.get_width() // 2, H // 2 + 30))
+            if error:
+                msg = font_title.render("Erreur de connexion", True, (220, 80, 80))
+                screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - 40))
+                err_surf = font_hint.render(error[:70], True, (200, 100, 100))
+                screen.blit(err_surf, (W // 2 - err_surf.get_width() // 2, H // 2 + 5))
+            else:
+                msg = font_title.render("Aucun enregistrement disponible", True, (220, 80, 80))
+                screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - 20))
+            hint = font_hint.render("Appuyez sur une touche pour revenir", True, (80, 80, 80))
+            screen.blit(hint, (W // 2 - hint.get_width() // 2, H // 2 + 50))
             pygame.display.flip()
             clock.tick(30)
         return None
@@ -192,12 +205,8 @@ def show_replay_browser(screen, clock):
                     if selected >= scroll_offset + VISIBLE:
                         scroll_offset = selected - VISIBLE + 1
                 elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                    e = entries[selected]
-                    if e["source"] == "local":
-                        return e["path"]
-                    else:
-                        # télécharger depuis le cloud
-                        return _download_cloud_recording(e["cloud_id"])
+                    # télécharger depuis MongoDB et jouer
+                    return _download_cloud_recording(entries[selected]["cloud_id"], screen, clock)
 
         W, H = screen.get_size()
         screen.fill((0, 0, 0))
@@ -229,7 +238,7 @@ def show_replay_browser(screen, clock):
             pygame.draw.rect(screen, (160, 160, 160), pygame.Rect(W - 16, bar_y, 8, bar_h))
 
         count_txt = font_hint.render(
-            f"{len(entries)} replay(s) – ↑↓ naviguer, Entrée sélectionner, ESC annuler",
+            f"{len(entries)} replay(s) sur MongoDB – ↑↓ naviguer, Entrée sélectionner, ESC annuler",
             True, (90, 90, 90)
         )
         screen.blit(count_txt, (W // 2 - count_txt.get_width() // 2, H - 36))
@@ -237,22 +246,54 @@ def show_replay_browser(screen, clock):
         clock.tick(30)
 
 
-def _download_cloud_recording(cloud_id):
+def _download_cloud_recording(cloud_id, screen=None, clock=None):
     """Télécharge un enregistrement cloud et le sauvegarde localement. Retourne le chemin local."""
-    try:
-        resp = requests.get(f"{API_URL}/recording/{cloud_id}", timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        RECORDINGS_DIR.mkdir(exist_ok=True)
-        ts = data.get("metadata", {}).get("recorded_at", int(time.time()))
-        filepath = RECORDINGS_DIR / f"game_{ts}_cloud.json"
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f)
-        print(f"Cloud recording downloaded: {filepath.name}")
-        return str(filepath)
-    except Exception as e:
-        print(f"Erreur téléchargement cloud: {e}")
-        return None
+    import threading
+    result = {"path": None, "error": None}
+
+    def _fetch():
+        try:
+            resp = requests.get(f"{API_URL}/recording/{cloud_id}", timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+            RECORDINGS_DIR.mkdir(exist_ok=True)
+            ts = data.get("metadata", {}).get("recorded_at", int(time.time()))
+            filepath = RECORDINGS_DIR / f"game_{ts}_cloud.json"
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            result["path"] = str(filepath)
+        except Exception as e:
+            result["error"] = str(e)
+
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
+
+    if screen and clock:
+        font = pygame.font.SysFont("monospace", 32, bold=True)
+        hint = pygame.font.SysFont("monospace", 16)
+        dots = 0
+        timer = 0
+        while t.is_alive():
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return None
+            W, H = screen.get_size()
+            screen.fill((0, 0, 0))
+            timer += 1
+            if timer % 20 == 0:
+                dots = (dots + 1) % 4
+            msg = font.render("Téléchargement" + "." * dots, True, (255, 220, 40))
+            screen.blit(msg, (W // 2 - msg.get_width() // 2, H // 2 - 20))
+            sub = hint.render("Récupération depuis MongoDB…", True, (120, 120, 120))
+            screen.blit(sub, (W // 2 - sub.get_width() // 2, H // 2 + 20))
+            pygame.display.flip()
+            clock.tick(30)
+    else:
+        t.join()
+
+    if result["error"]:
+        print(f"Erreur téléchargement cloud: {result['error']}")
+    return result["path"]
 
 
 def show_main_menu(screen, clock):
@@ -597,6 +638,7 @@ class LocalPacmanGame:
             level=loaded.metadata.get("level"),
         )
         self.engine = GameEngine(self.env, self.pacman, self.ghosts, self.recorder)
+        self.engine.no_death = True   # les fantômes ne tuent pas pac-man en replay
         self.solo_recording_path = str(rec_path)
         print(f"mode replay : {rec_path.name} avec IA {pathfinder}")
 

@@ -50,6 +50,9 @@ class GameEngine:
         # points quand on mange un fantôme
         self.ghost_eat_combo = 200
 
+        # en mode replay les fantômes ne tuent pas pac-man
+        self.no_death = False
+
         # apparition des fruits
         self.pellets_eaten = 0
         self.fruit_spawned_1 = False
@@ -143,7 +146,8 @@ class GameEngine:
                     ghost.reset()
                     ghost.mode = GhostMode.EATEN
                 elif ghost.mode != GhostMode.EATEN:
-                    self._pacman_dies()
+                    if not self.no_death:
+                        self._pacman_dies()
                     return
 
     def _pacman_dies(self):

@@ -29,6 +29,10 @@ class ReplayPacmanAgent(Agent):
         self.route = route
         self.route_index = 0
 
+    def reset(self):
+        super().reset()
+        self.route_index = 0
+
     def get_action(self, environment, **context):
         if self.route_index >= len(self.route) - 1:
             return (0, 0)
