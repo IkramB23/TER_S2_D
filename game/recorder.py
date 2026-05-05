@@ -11,13 +11,14 @@ class GameRecorder:
         self.frames = []
         self.metadata = {}
 
-    def set_metadata(self, maze, width, height, cloud_id=None, agent_type="human"):
+    def set_metadata(self, maze, width, height, cloud_id=None, agent_type="human", level=None):
         self.metadata = {
             "maze": maze,
             "width": width,
             "height": height,
             "cloud_id": cloud_id,
             "agent_type": agent_type,
+            "level": level,
             "recorded_at": int(time.time()),
         }
 
@@ -28,6 +29,9 @@ class GameRecorder:
         # sauvegarde l'enregistrement dans un fichier json
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
+        # enrichit les métadonnées avec le score final et le nombre de frames
+        self.metadata["score_final"] = self.get_final_score()
+        self.metadata["nb_frames"] = len(self.frames)
         # convertit les tuples/frozensets en listes pour json
         data = {
             "metadata": self.metadata,

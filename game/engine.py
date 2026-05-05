@@ -39,6 +39,9 @@ class GameEngine:
         self.ghost_speed = 8
         self.ghost_frightened_speed = 12
 
+        # durée du mode frightened en ticks (modifiable par niveau)
+        self.frightened_duration = 480
+
         # suite des modes des fantômes
         self.ghost_mode_index = 0
         self.ghost_mode_timer = MODE_SEQUENCE[0][1]
@@ -64,7 +67,7 @@ class GameEngine:
 
         # --- déplacer pac-man ---
         if self.tick_count % self.pacman_speed == 0:
-            action = self.pacman.get_action(self.env)
+            action = self.pacman.get_action(self.env, ghosts=self.ghosts)
             if action != (0, 0):
                 nx = self.pacman.x + action[0]
                 ny = self.pacman.y + action[1]
@@ -124,7 +127,7 @@ class GameEngine:
             if is_power:
                 self.ghost_eat_combo = 200
                 for ghost in self.ghosts:
-                    ghost.set_frightened()
+                    ghost.set_frightened(self.frightened_duration)
 
         # manger un fruit
         fruit_pts = self.env.eat_fruit(x, y)

@@ -17,8 +17,10 @@ if MONGO_URI and MongoClient is not None:
     client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
     db = client.pacman_db
     mazes_collection = db.mazes
+    recordings_collection = db.recordings
 else:
     mazes_collection = None
+    recordings_collection = None
 
 @app.route("/")
 def home():
@@ -123,6 +125,63 @@ def run_benchmark():
         )
 
     return jsonify(report)
+
+
+
+
+# --- enregistrements de parties ---
+
+@app.route("/recording", methods=["POST"])
+def save_recording():
+    """Sauvegarde un enregistrement de partie dans MongoDB."""
+    data = request.json
+    if not data:
+        return jsonify({"error": "Corps JSON requis"}), 400
+    if recordings_collection is None:
+        return jsonify({"error": "Base de données non configurée"}), 503
+    rec_id = str(uuid.uuid4())
+    try:
+        doc = {"_id": rec_id}
+        doc["metadata"] = data.get("metadata", {})
+        doc["total_frames"] = data.get("total_frames", 0)
+        doc["frames"] = data.get("frames", [])
+        recordings_collection.insert_one(doc)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    return jsonify({"id": rec_id})
+
+
+@app.route("/recordings")
+def list_recordings():
+    """Retourne la liste des enregistrements (sans les frames ni le labyrinthe)."""
+    if recordings_collection is None:
+        return jsonify({"error": "Base de données non configurée"}), 503
+    try:
+        cursor = recordings_collection.find(
+            {}, {"frames": 0, "metadata.maze": 0}
+        ).sort("metadata.recorded_at", -1).limit(100)
+        results = []
+        for doc in cursor:
+            doc["id"] = str(doc.pop("_id"))
+            results.append(doc)
+        return jsonify({"recordings": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/recording/<rec_id>")
+def get_recording(rec_id):
+    """Retourne un enregistrement complet (avec frames et labyrinthe)."""
+    if recordings_collection is None:
+        return jsonify({"error": "Base de données non configurée"}), 503
+    try:
+        doc = recordings_collection.find_one({"_id": rec_id})
+        if doc is None:
+            return jsonify({"error": "Enregistrement introuvable"}), 404
+        doc["id"] = str(doc.pop("_id"))
+        return jsonify(doc)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

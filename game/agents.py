@@ -262,6 +262,100 @@ class HumanAgent(Agent):
         return (0, 0)
 
 
+# --- agent pac-man ia ---
+
+class AIPacmanAgent(Agent):
+    """Pac-Man contrôlé par un algorithme de recherche de chemin.
+
+    Stratégies disponibles :
+      - "bfs"   : BFS vers la pastille la plus proche (optimal, sûr)
+      - "astar" : A* vers la pastille la plus proche (plus efficace sur grands labyrinthes)
+      - "avoid" : BFS mais ignore les cellules adjacentes aux fantômes
+    """
+
+    def __init__(self, x, y, strategy="bfs"):
+        super().__init__(x, y)
+        self.strategy = strategy
+        # cache pour éviter de recalculer la cible à chaque tick
+        self._target = None
+
+    def get_action(self, environment, **context):
+        ghosts = context.get("ghosts", [])
+        walls = environment.walls
+
+        # construire l'ensemble des cases dangereuses (fantômes non-effrayés à 1 case)
+        if self.strategy == "avoid" and ghosts:
+            danger = set()
+            for g in ghosts:
+                if not getattr(g, "frightened_timer", 0):
+                    for dx, dy in [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        danger.add((g.x + dx, g.y + dy))
+        else:
+            danger = set()
+
+        # trouver la pastille (pellet) la plus proche via BFS (ignore les cases dangereuses)
+        target = self._find_nearest_pellet(environment, danger)
+        if target is None:
+            # aucune pastille restante : rester sur place
+            return (0, 0)
+
+        # choisir la direction vers la cible
+        if self.strategy == "astar":
+            direction = astar_direction(
+                walls, environment.width, environment.height,
+                (self.x, self.y), target
+            )
+        else:
+            # bfs ou avoid : même primitive BFS
+            direction = bfs_direction(
+                walls, environment.width, environment.height,
+                (self.x, self.y), target
+            )
+
+        if direction is not None:
+            self.direction = direction
+            return direction
+
+        # si le chemin est bloqué, essayer d'avancer dans la direction actuelle
+        nx, ny = self.x + self.direction[0], self.y + self.direction[1]
+        if self.direction != (0, 0) and environment.is_corridor(nx, ny):
+            return self.direction
+
+        return (0, 0)
+
+    def _find_nearest_pellet(self, environment, danger):
+        """BFS depuis la position actuelle vers la case avec une pastille."""
+        from collections import deque
+        start = (self.x, self.y)
+        if not environment.pellets and not environment.power_pellets:
+            return None
+
+        all_pellets = set(environment.pellets) | set(environment.power_pellets)
+        visited = {start}
+        queue = deque([start])
+
+        while queue:
+            cx, cy = queue.popleft()
+            if (cx, cy) in all_pellets:
+                return (cx, cy)
+            for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                nx, ny = cx + dx, cy + dy
+                pos = (nx, ny)
+                if pos in visited:
+                    continue
+                if not environment.is_corridor(nx, ny):
+                    continue
+                if pos in danger:
+                    continue
+                visited.add(pos)
+                queue.append(pos)
+
+        # si toutes les cases sans danger sont épuisées, essayer sans restriction
+        if danger:
+            return self._find_nearest_pellet(environment, set())
+        return None
+
+
 # --- agents fantômes ---
 
 class GhostAgent(Agent):
