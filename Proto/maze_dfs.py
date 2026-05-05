@@ -1,3 +1,4 @@
+#ikram
 # generation de labyrinthe avec DFS + boucles pour pac-man
 import random
 
