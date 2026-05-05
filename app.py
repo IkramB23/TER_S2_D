@@ -171,8 +171,6 @@ def list_recordings():
         for doc in cursor:
             doc["id"] = str(doc.pop("_id"))
             results.append(doc)
-        # tri par date décroissante en Python (évite la limite mémoire MongoDB M0)
-        results.sort(key=lambda r: r.get("metadata", {}).get("recorded_at", 0), reverse=True)
         return jsonify({"recordings": results})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
