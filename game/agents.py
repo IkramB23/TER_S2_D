@@ -210,6 +210,57 @@ def predict_pacman_position(environment, pacman, steps=3):
     return (x, y)
 
 
+# --- helpers pour la recherche adversariale ---
+
+def _get_valid_moves(pos, walls, width, height):
+    """Retourne les directions valides depuis pos (sans franchir un mur)."""
+    x, y = pos
+    moves = []
+    for dx, dy in DIRECTIONS:
+        nx, ny = x + dx, y + dy
+        if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in walls:
+            moves.append((dx, dy))
+    return moves if moves else [(0, 0)]
+
+
+def _eval_heuristic(pac_pos, ghost_states, env):
+    """Fonction d'évaluation partagée par Minimax et Expectimax.
+
+    ghost_states : liste de (x, y, mode, frightened_timer)
+    Retourne un score flottant (plus élevé = meilleur pour Pac-Man).
+    """
+    score = 0.0
+
+    # 1. Proximité à la pastille la plus proche (manhattan)
+    all_pellets = env.pellets | env.power_pellets
+    if all_pellets:
+        min_dist = min(_manhattan(pac_pos, p) for p in all_pellets)
+        score += 200.0 / (1.0 + min_dist)
+    else:
+        score += 500.0  # presque en victoire
+
+    # 2. Pénalité pour les fantômes actifs proches
+    for gx, gy, gmode, _ in ghost_states:
+        if gmode not in (GhostMode.FRIGHTENED, GhostMode.CAGED, GhostMode.EATEN):
+            dist = max(1, _manhattan(pac_pos, (gx, gy)))
+            if dist <= 2:
+                score -= 1000.0 / dist
+            elif dist <= 5:
+                score -= 150.0 / dist
+
+    # 3. Bonus pour chasser les fantômes effrayés
+    for gx, gy, gmode, gtimer in ghost_states:
+        if gmode == GhostMode.FRIGHTENED and gtimer > 0:
+            dist = max(1, _manhattan(pac_pos, (gx, gy)))
+            score += 300.0 / dist
+
+    # 4. Récompense proportionnelle aux pastilles déjà mangées
+    remaining = len(env.pellets) + len(env.power_pellets)
+    score += (env.total_pellets - remaining) * 10.0
+
+    return score
+
+
 # --- classe de base des agents ---
 
 class Agent(ABC):
@@ -354,6 +405,209 @@ class AIPacmanAgent(Agent):
         if danger:
             return self._find_nearest_pellet(environment, set())
         return None
+
+
+# --- agent pac-man ia : minimax avec élagage alpha-beta ---
+
+class MinimaxPacmanAgent(Agent):
+    """Pac-Man contrôlé par l'algorithme Minimax avec élagage Alpha-Beta.
+
+    Pac-Man est le joueur MAX.
+    Chaque fantôme non-effrayé est un joueur MIN (adversaire parfait).
+    L'élagage alpha-beta évite d'explorer les branches inutiles.
+
+    Paramètre depth (défaut 0) :
+      depth=0 → Pac-Man regarde 1 round de décision en avant
+                 (1 coup Pac + tous les fantômes une fois via alpha-beta) ~ 27–243 évaluations.
+      depth=1 → 2 rounds de décision → peut être lent selon l'élagage.
+    """
+
+    def __init__(self, x, y, depth=0):
+        super().__init__(x, y)
+        self.depth = max(0, depth)
+
+    def get_action(self, environment, **context):
+        ghosts = context.get("ghosts", [])
+        pac_pos = (self.x, self.y)
+        ghost_states = [
+            (g.x, g.y, g.mode, getattr(g, "frightened_timer", 0))
+            for g in ghosts
+        ]
+
+        best_val = float("-inf")
+        best_dir = (0, 0)
+        alpha = float("-inf")
+        beta = float("inf")
+
+        for dx, dy in _get_valid_moves(
+            pac_pos, environment.walls, environment.width, environment.height
+        ):
+            nx, ny = pac_pos[0] + dx, pac_pos[1] + dy
+            # Évalue cette position en commençant par le tour des fantômes
+            val = self._alphabeta(
+                (nx, ny), ghost_states, self.depth, 1, alpha, beta, environment
+            )
+            if val > best_val:
+                best_val = val
+                best_dir = (dx, dy)
+            alpha = max(alpha, val)
+
+        if best_dir != (0, 0):
+            self.direction = best_dir
+        return best_dir
+
+    def _alphabeta(self, pac_pos, ghost_states, depth, agent_idx, alpha, beta, env):
+        """Minimax récursif avec élagage Alpha-Beta.
+
+        agent_idx = 0 → Pac-Man (MAX)
+        agent_idx = 1..n → fantôme k (MIN)
+        depth → nombre de tours de Pac-Man restants à explorer.
+        """
+        num_ghosts = len(ghost_states)
+
+        # Détection d'une capture (état terminal immédiat)
+        for gx, gy, gmode, _ in ghost_states:
+            if (gx, gy) == pac_pos and gmode not in (
+                GhostMode.FRIGHTENED, GhostMode.CAGED, GhostMode.EATEN
+            ):
+                return -99999
+
+        # ---- Tour de Pac-Man (MAX) ----
+        if agent_idx == 0:
+            if depth == 0:
+                return _eval_heuristic(pac_pos, ghost_states, env)
+            best = float("-inf")
+            for dx, dy in _get_valid_moves(
+                pac_pos, env.walls, env.width, env.height
+            ):
+                nx, ny = pac_pos[0] + dx, pac_pos[1] + dy
+                val = self._alphabeta(
+                    (nx, ny), ghost_states, depth - 1, 1, alpha, beta, env
+                )
+                best = max(best, val)
+                alpha = max(alpha, best)
+                if beta <= alpha:
+                    break  # élagage bêta
+            return best
+
+        # ---- Tour d'un fantôme (MIN) ----
+        g_idx = agent_idx - 1
+        gx, gy, gmode, gtimer = ghost_states[g_idx]
+        next_agent = 0 if agent_idx == num_ghosts else agent_idx + 1
+
+        # Fantôme inactif : passer son tour sans changer l'état
+        if gmode in (GhostMode.FRIGHTENED, GhostMode.CAGED, GhostMode.EATEN):
+            return self._alphabeta(
+                pac_pos, ghost_states, depth, next_agent, alpha, beta, env
+            )
+
+        moves = _get_valid_moves((gx, gy), env.walls, env.width, env.height)
+        best = float("inf")
+        for dx, dy in moves:
+            ngx, ngy = gx + dx, gy + dy
+            new_gs = list(ghost_states)
+            new_gs[g_idx] = (ngx, ngy, gmode, gtimer)
+            val = self._alphabeta(
+                pac_pos, new_gs, depth, next_agent, alpha, beta, env
+            )
+            best = min(best, val)
+            beta = min(beta, best)
+            if beta <= alpha:
+                break  # élagage alpha
+        return best
+
+
+# --- agent pac-man ia : expectimax ---
+
+class ExpectimaxPacmanAgent(Agent):
+    """Pac-Man contrôlé par l'algorithme Expectimax.
+
+    Pac-Man est le joueur MAX.
+    Les fantômes sont des nœuds CHANCE (distribution uniforme sur leurs
+    mouvements valides) — modèle plus réaliste que Minimax car les fantômes
+    ne jouent pas de façon parfaitement adversariale.
+
+    Paramètre depth (défaut 0) :
+      depth=0 → 1 round (1 coup Pac + 4 fantômes en chance node) ~ 243 éval. (RAPIDE)
+      depth=1 → très lent en Python pur (pas d'élagage comme Alpha-Beta).
+    """
+
+    def __init__(self, x, y, depth=0):
+        super().__init__(x, y)
+        self.depth = max(0, depth)
+
+    def get_action(self, environment, **context):
+        ghosts = context.get("ghosts", [])
+        pac_pos = (self.x, self.y)
+        ghost_states = [
+            (g.x, g.y, g.mode, getattr(g, "frightened_timer", 0))
+            for g in ghosts
+        ]
+
+        best_val = float("-inf")
+        best_dir = (0, 0)
+
+        for dx, dy in _get_valid_moves(
+            pac_pos, environment.walls, environment.width, environment.height
+        ):
+            nx, ny = pac_pos[0] + dx, pac_pos[1] + dy
+            val = self._expectimax((nx, ny), ghost_states, self.depth, 1, environment)
+            if val > best_val:
+                best_val = val
+                best_dir = (dx, dy)
+
+        if best_dir != (0, 0):
+            self.direction = best_dir
+        return best_dir
+
+    def _expectimax(self, pac_pos, ghost_states, depth, agent_idx, env):
+        """Expectimax récursif.
+
+        agent_idx = 0 → Pac-Man (MAX)
+        agent_idx = 1..n → fantôme k (CHANCE : moyenne des successeurs)
+        """
+        num_ghosts = len(ghost_states)
+
+        # Détection d'une capture
+        for gx, gy, gmode, _ in ghost_states:
+            if (gx, gy) == pac_pos and gmode not in (
+                GhostMode.FRIGHTENED, GhostMode.CAGED, GhostMode.EATEN
+            ):
+                return -99999
+
+        # ---- Tour de Pac-Man (MAX) ----
+        if agent_idx == 0:
+            if depth == 0:
+                return _eval_heuristic(pac_pos, ghost_states, env)
+            best = float("-inf")
+            for dx, dy in _get_valid_moves(
+                pac_pos, env.walls, env.width, env.height
+            ):
+                nx, ny = pac_pos[0] + dx, pac_pos[1] + dy
+                val = self._expectimax(
+                    (nx, ny), ghost_states, depth - 1, 1, env
+                )
+                best = max(best, val)
+            return best
+
+        # ---- Tour d'un fantôme (CHANCE) ----
+        g_idx = agent_idx - 1
+        gx, gy, gmode, gtimer = ghost_states[g_idx]
+        next_agent = 0 if agent_idx == num_ghosts else agent_idx + 1
+
+        # Fantôme inactif : passer son tour
+        if gmode in (GhostMode.FRIGHTENED, GhostMode.CAGED, GhostMode.EATEN):
+            return self._expectimax(pac_pos, ghost_states, depth, next_agent, env)
+
+        moves = _get_valid_moves((gx, gy), env.walls, env.width, env.height)
+        total = 0.0
+        for dx, dy in moves:
+            ngx, ngy = gx + dx, gy + dy
+            new_gs = list(ghost_states)
+            new_gs[g_idx] = (ngx, ngy, gmode, gtimer)
+            total += self._expectimax(pac_pos, new_gs, depth, next_agent, env)
+        # Espérance : moyenne uniforme sur les mouvements valides
+        return total / len(moves)
 
 
 # --- agents fantômes ---

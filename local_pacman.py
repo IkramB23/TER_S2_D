@@ -8,7 +8,10 @@ import requests
 
 from Proto.maze_Prim_loops import generate_pacman_maze
 from game.environment import Environment
-from game.agents import HumanAgent, AIPacmanAgent, BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost, GhostAgent
+from game.agents import (
+    HumanAgent, AIPacmanAgent, MinimaxPacmanAgent, ExpectimaxPacmanAgent,
+    BlinkyGhost, PinkyGhost, InkyGhost, ClydeGhost, GhostAgent
+)
 from game.engine import GameEngine
 from game.recorder import GameRecorder
 from game.renderer import PacmanRenderer
@@ -53,28 +56,33 @@ LEVEL_CONFIG = {
 
 def show_ai_pacman_menu(screen, clock):
     """Menu de choix d'algorithme pour le mode Pac-Man IA.
-    Retourne 'bfs', 'astar', 'avoid' ou None pour annuler."""
-    font_title = pygame.font.SysFont("monospace", 44, bold=True)
-    font_opt   = pygame.font.SysFont("monospace", 28, bold=True)
-    font_desc  = pygame.font.SysFont("monospace", 17)
+    Retourne 'bfs', 'astar', 'avoid', 'minimax', 'expectimax' ou None."""
+    font_title = pygame.font.SysFont("monospace", 40, bold=True)
+    font_opt   = pygame.font.SysFont("monospace", 24, bold=True)
+    font_desc  = pygame.font.SysFont("monospace", 15)
 
     options = [
-        ("B", "bfs",   (80, 180, 255),  "BFS",     "Parcours en largeur – optimal et sûr"),
-        ("A", "astar", (130, 230, 80),  "A*",      "A* heuristique – plus rapide sur grands labyrinthes"),
-        ("E", "avoid", (255, 180, 40),  "Évitement","BFS + évitement des fantômes proches"),
+        ("B", "bfs",        (80,  180, 255), "BFS",        "Parcours en largeur – optimal et sûr"),
+        ("A", "astar",      (130, 230,  80), "A*",         "A* heuristique – plus rapide sur grands labyrinthes"),
+        ("E", "avoid",      (255, 180,  40), "Évitement",  "BFS + évitement des fantômes proches"),
+        ("M", "minimax",    (220,  80, 220), "Minimax+AB", "Minimax avec élagage Alpha-Beta (adversarial)"),
+        ("X", "expectimax", (80,  220, 200), "Expectimax", "Expectimax – fantômes modélisés comme agents probabilistes"),
     ]
+    key_map = {
+        pygame.K_b: "bfs",
+        pygame.K_a: "astar",
+        pygame.K_e: "avoid",
+        pygame.K_m: "minimax",
+        pygame.K_x: "expectimax",
+    }
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_b:
-                    return "bfs"
-                elif event.key == pygame.K_a:
-                    return "astar"
-                elif event.key == pygame.K_e:
-                    return "avoid"
+                if event.key in key_map:
+                    return key_map[event.key]
                 elif event.key == pygame.K_ESCAPE:
                     return None
 
@@ -82,20 +90,20 @@ def show_ai_pacman_menu(screen, clock):
         screen.fill((0, 0, 0))
 
         title = font_title.render("Pac-Man IA – Choisir l'algo", True, (255, 220, 40))
-        screen.blit(title, (W // 2 - title.get_width() // 2, 60))
+        screen.blit(title, (W // 2 - title.get_width() // 2, 45))
 
         for i, (key, _, color, name, desc) in enumerate(options):
-            y = 160 + i * 110
-            box = pygame.Rect(W // 2 - 300, y, 600, 90)
+            y = 115 + i * 90
+            box = pygame.Rect(W // 2 - 310, y, 620, 78)
             pygame.draw.rect(screen, (15, 15, 15), box, border_radius=10)
             pygame.draw.rect(screen, color, box, width=2, border_radius=10)
             label = font_opt.render(f"[{key}]  {name}", True, color)
-            screen.blit(label, (box.x + 20, box.y + 12))
+            screen.blit(label, (box.x + 18, box.y + 10))
             d = font_desc.render(desc, True, (200, 200, 200))
-            screen.blit(d, (box.x + 20, box.y + 54))
+            screen.blit(d, (box.x + 18, box.y + 46))
 
         hint = font_desc.render("ESC pour revenir", True, (80, 80, 80))
-        screen.blit(hint, (W // 2 - hint.get_width() // 2, H - 50))
+        screen.blit(hint, (W // 2 - hint.get_width() // 2, H - 40))
 
         pygame.display.flip()
         clock.tick(30)
@@ -561,7 +569,12 @@ class LocalPacmanGame:
         self.env = Environment(maze)
 
         pac_pos = self.env.find_pacman_spawn()
-        self.pacman = AIPacmanAgent(*pac_pos, strategy=strategy)
+        if strategy == "minimax":
+            self.pacman = MinimaxPacmanAgent(*pac_pos, depth=0)
+        elif strategy == "expectimax":
+            self.pacman = ExpectimaxPacmanAgent(*pac_pos, depth=0)
+        else:
+            self.pacman = AIPacmanAgent(*pac_pos, strategy=strategy)
         self.ai_strategy = strategy
 
         ghost_spawns = self.env.find_ghost_spawns(4)
