@@ -89,34 +89,59 @@ TER_S2_D/
   .github/workflows/       # CI GitHub Actions
 ```
 
-## Algorithmes de poursuite
+## Algorithmes de poursuite (fantomes)
 
 Le module `game/agents.py` implemente 5 algorithmes de pathfinding pour les fantomes :
 
-- **BFS** : parcours en largeur, baseline qui trouve le chemin le plus court
-- **A*** : recherche informee avec heuristique Manhattan, optimal et plus rapide que BFS
-- **DFS** : parcours en profondeur, non-optimal mais different comportement de poursuite
-- **UCS** : recherche a cout uniforme, equivalent a BFS sur grille uniforme
-- **MCTS** : Monte Carlo Tree Search, exploration aleatoire avec simulation
+| Algorithme | Description |
+|------------|-------------|
+| BFS | Parcours en largeur, baseline qui trouve le chemin le plus court |
+| A* | Recherche informee avec heuristique Manhattan, optimal et plus rapide que BFS |
+| DFS | Parcours en profondeur, non-optimal mais comportement de poursuite different |
+| UCS | Recherche a cout uniforme, equivalent a BFS sur grille uniforme |
+| MCTS | Monte Carlo Tree Search, exploration aleatoire avec simulation |
 
-Chaque fantome a un comportement propre :
-- Blinky (rouge) : cible directement Pac-Man
-- Pinky (rose) : vise 4 cases devant Pac-Man
-- Inky (cyan) : utilise la position de Blinky pour prendre en tenaille
-- Clyde (orange) : fuit quand il est proche, poursuit quand il est loin
+La difficulte du niveau determine l'algorithme utilise par les fantomes :
 
-## Benchmark
+| Niveau | Pathfinding | Vitesse fantome | Anticipation |
+|--------|-------------|-----------------|---------------|
+| Facile | BFS | lente (14 ticks) | aucune |
+| Moyen | A* | normale (8 ticks) | aucune |
+| Difficile | A* | rapide (6 ticks) | 3 pas en avance |
 
-Le framework compare les strategies sur un meme trajet de Pac-Man :
+## Agents IA pour Pac-Man
+
+Trois agents IA pilotent Pac-Man automatiquement, accessibles en mode replay (touche **2**) :
+
+| Agent | Description |
+|-------|-------------|
+| AStarPacmanAgent | Pac-Man suit le chemin A* vers la pastille la plus proche |
+| MinimaxPacmanAgent | Minimax avec elagage Alpha-Beta, depth=0, 4 fantomes actifs |
+| ExpectimaxPacmanAgent | Expectimax (noeuds chance), depth=0, modelise le comportement aleatoire des fantomes |
+
+## Lancer les benchmarks
+
+Benchmark IA vs humains (6 configurations : 2 niveaux humains + 4 agents IA) :
 
 ```bash
-python -c "from game.framework import compare_day6_strategies; print(compare_day6_strategies())"
+python benchmark_ia_vs_humain.py
 ```
 
-Ou via l'API :
+Benchmark algorithmes de poursuite sur un trajet enregistre :
 
 ```bash
-curl -X POST https://ter-s2-d-85u5.onrender.com/ai/benchmark
+python -m pytest tests/test_framework.py -v
+```
+
+Ou directement via l'API :
+
+```
+POST /ai/benchmark
+{
+  "maze": [...],
+  "route": [...],
+  "strategies": ["bfs", "astar", "dfs", "ucs", "mcts"]
+}
 ```
 
 ## Base de donnees
